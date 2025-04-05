@@ -20,6 +20,8 @@ def read_recipes(
     limit: int = 100,
     search: Optional[str] = None,
     category: Optional[str] = None,
+    ingredient: Optional[str] = None,
+    max_total_time: Optional[int] = Query(None, description="Maximum total time (prep + cook) in minutes"),
     db: Session = Depends(get_db)
 ):
     """
@@ -30,13 +32,29 @@ def read_recipes(
         limit: Maximum number of recipes to return
         search: Optional search term to filter recipes by name
         category: Optional category name to filter recipes
+        ingredient: Optional ingredient name to filter recipes
+        max_total_time: Optional maximum total time (prep + cook) in minutes
         db: Database session
         
     Returns:
         List of recipes matching the criteria
     """
-    recipes = crud.get_recipes(db, skip=skip, limit=limit, search=search, category=category)
-    total = crud.count_recipes(db, search=search, category=category)
+    recipes = crud.get_recipes(
+        db, 
+        skip=skip, 
+        limit=limit, 
+        search=search, 
+        category=category,
+        ingredient=ingredient,
+        max_total_time=max_total_time
+    )
+    total = crud.count_recipes(
+        db, 
+        search=search, 
+        category=category,
+        ingredient=ingredient,
+        max_total_time=max_total_time
+    )
     return {"recipes": recipes, "total": total}
 
 

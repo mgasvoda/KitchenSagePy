@@ -3,6 +3,7 @@
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
+import re
 
 from . import models, schemas
 from .scrapers.paprika_scraper import scrape_recipe_from_file
@@ -40,7 +41,9 @@ def get_recipes(
     skip: int = 0, 
     limit: int = 100,
     search: Optional[str] = None,
-    category: Optional[str] = None
+    category: Optional[str] = None,
+    ingredient: Optional[str] = None,
+    max_total_time: Optional[int] = None
 ) -> List[models.Recipe]:
     """
     Get all recipes with optional filtering.
@@ -51,6 +54,8 @@ def get_recipes(
         limit: Maximum number of recipes to return
         search: Optional search term to filter recipes by name
         category: Optional category name to filter recipes
+        ingredient: Optional ingredient name to filter recipes
+        max_total_time: Optional maximum total time (prep + cook) in minutes
         
     Returns:
         List of recipes matching the criteria
@@ -73,6 +78,44 @@ def get_recipes(
             models.Category.name == category
         )
     
+    # Apply ingredient filter if provided
+    if ingredient:
+        ingredient_term = f"%{ingredient}%"
+        query = query.join(models.Recipe.ingredients).filter(
+            models.Ingredient.name.ilike(ingredient_term)
+        )
+    
+    # Apply total time filter if provided
+    if max_total_time is not None:
+        # This is a simplified approach since prep_time and cook_time are stored as strings
+        # We'll filter recipes where we can parse the times and their sum is <= max_total_time
+        recipes_with_valid_times = []
+        all_recipes = query.all()
+        
+        for recipe in all_recipes:
+            total_minutes = 0
+            
+            # Try to parse prep_time
+            if recipe.prep_time:
+                prep_minutes = parse_time_to_minutes(recipe.prep_time)
+                if prep_minutes is not None:
+                    total_minutes += prep_minutes
+            
+            # Try to parse cook_time
+            if recipe.cook_time:
+                cook_minutes = parse_time_to_minutes(recipe.cook_time)
+                if cook_minutes is not None:
+                    total_minutes += cook_minutes
+            
+            # Include recipe if total time is within limit or if we couldn't parse times
+            if total_minutes == 0 or total_minutes <= max_total_time:
+                recipes_with_valid_times.append(recipe)
+        
+        # Apply pagination to filtered recipes
+        start_idx = min(skip, len(recipes_with_valid_times))
+        end_idx = min(start_idx + limit, len(recipes_with_valid_times))
+        return recipes_with_valid_times[start_idx:end_idx]
+    
     # Apply pagination
     return query.order_by(models.Recipe.name).offset(skip).limit(limit).all()
 
@@ -80,7 +123,9 @@ def get_recipes(
 def count_recipes(
     db: Session,
     search: Optional[str] = None,
-    category: Optional[str] = None
+    category: Optional[str] = None,
+    ingredient: Optional[str] = None,
+    max_total_time: Optional[int] = None
 ) -> int:
     """Count the total number of recipes matching the filters."""
     query = db.query(models.Recipe)
@@ -101,7 +146,77 @@ def count_recipes(
             models.Category.name == category
         )
     
+    # Apply ingredient filter if provided
+    if ingredient:
+        ingredient_term = f"%{ingredient}%"
+        query = query.join(models.Recipe.ingredients).filter(
+            models.Ingredient.name.ilike(ingredient_term)
+        )
+    
+    # Apply total time filter if provided
+    if max_total_time is not None:
+        # This is a simplified approach since prep_time and cook_time are stored as strings
+        # We'll count recipes where we can parse the times and their sum is <= max_total_time
+        recipes_with_valid_times = []
+        all_recipes = query.all()
+        
+        for recipe in all_recipes:
+            total_minutes = 0
+            
+            # Try to parse prep_time
+            if recipe.prep_time:
+                prep_minutes = parse_time_to_minutes(recipe.prep_time)
+                if prep_minutes is not None:
+                    total_minutes += prep_minutes
+            
+            # Try to parse cook_time
+            if recipe.cook_time:
+                cook_minutes = parse_time_to_minutes(recipe.cook_time)
+                if cook_minutes is not None:
+                    total_minutes += cook_minutes
+            
+            # Include recipe if total time is within limit or if we couldn't parse times
+            if total_minutes == 0 or total_minutes <= max_total_time:
+                recipes_with_valid_times.append(recipe)
+        
+        return len(recipes_with_valid_times)
+    
     return query.count()
+
+
+def parse_time_to_minutes(time_str: str) -> Optional[int]:
+    """
+    Parse a time string (e.g., '1 hour 30 minutes', '45 min') to minutes.
+    
+    Args:
+        time_str: Time string to parse
+        
+    Returns:
+        Total minutes or None if parsing failed
+    """
+    if not time_str:
+        return None
+    
+    time_str = time_str.lower()
+    total_minutes = 0
+    
+    # Extract hours
+    hour_match = re.search(r'(\d+)\s*(?:hour|hr|h)', time_str)
+    if hour_match:
+        total_minutes += int(hour_match.group(1)) * 60
+    
+    # Extract minutes
+    minute_match = re.search(r'(\d+)\s*(?:minute|min|m)', time_str)
+    if minute_match:
+        total_minutes += int(minute_match.group(1))
+    
+    # If no match found, try to parse as just a number (assuming minutes)
+    if total_minutes == 0:
+        number_match = re.search(r'(\d+)', time_str)
+        if number_match:
+            total_minutes = int(number_match.group(1))
+    
+    return total_minutes if total_minutes > 0 else None
 
 
 def create_recipe(db: Session, recipe: schemas.RecipeCreate) -> models.Recipe:
