@@ -58,6 +58,8 @@ class RecipeBase(BaseModel):
     name: str
     source: Optional[str] = None
     rating: int = 0
+    prep_time: Optional[str] = None
+    cook_time: Optional[str] = None
 
 
 class RecipeCreate(RecipeBase):

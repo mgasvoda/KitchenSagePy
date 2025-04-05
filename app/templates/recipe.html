@@ -43,6 +43,15 @@
                         <p class="recipe-source">Source: {{ recipe.source }}</p>
                     {% endif %}
                     
+                    <div class="recipe-times">
+                        {% if recipe.prep_time %}
+                            <p class="recipe-prep-time">Prep Time: {{ recipe.prep_time }}</p>
+                        {% endif %}
+                        {% if recipe.cook_time %}
+                            <p class="recipe-cook-time">Cook Time: {{ recipe.cook_time }}</p>
+                        {% endif %}
+                    </div>
+                    
                     {% if recipe.categories %}
                         <div class="recipe-categories">
                             {% for category in recipe.categories %}

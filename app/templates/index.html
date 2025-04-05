@@ -78,6 +78,17 @@
                                             {% endfor %}
                                         </div>
                                     {% endif %}
+                                    
+                                    {% if recipe.prep_time or recipe.cook_time %}
+                                        <div class="recipe-card-times">
+                                            {% if recipe.prep_time %}
+                                                <span class="recipe-card-prep-time">Prep: {{ recipe.prep_time }}</span>
+                                            {% endif %}
+                                            {% if recipe.cook_time %}
+                                                <span class="recipe-card-cook-time">Cook: {{ recipe.cook_time }}</span>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
                                 </a>
                             </div>
                         {% endfor %}

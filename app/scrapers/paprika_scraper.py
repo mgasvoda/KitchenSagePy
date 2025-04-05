@@ -34,6 +34,8 @@ class PaprikaRecipeScraper:
             "rating": self._extract_rating(),
             "categories": self._extract_categories(),
             "source": self._extract_source(),
+            "prep_time": self._extract_prep_time(),
+            "cook_time": self._extract_cook_time(),
             "ingredients": self._extract_ingredients(),
             "directions": self._extract_directions(),
         }
@@ -72,6 +74,34 @@ class PaprikaRecipeScraper:
         """Extract the recipe source."""
         source_element = self.recipe_div.find('span', {'itemprop': 'author'})
         return source_element.text.strip() if source_element else None
+    
+    def _extract_prep_time(self) -> Optional[str]:
+        """Extract the recipe preparation time."""
+        metadata = self.recipe_div.find('p', {'class': 'metadata'})
+        if not metadata:
+            return None
+            
+        prep_time_label = metadata.find(string=lambda text: text and "Prep Time:" in text)
+        if prep_time_label:
+            # Find the next span element after the label
+            prep_time_element = prep_time_label.find_next('span')
+            if prep_time_element:
+                return prep_time_element.text.strip()
+        return None
+    
+    def _extract_cook_time(self) -> Optional[str]:
+        """Extract the recipe cooking time."""
+        metadata = self.recipe_div.find('p', {'class': 'metadata'})
+        if not metadata:
+            return None
+            
+        cook_time_label = metadata.find(string=lambda text: text and "Cook Time:" in text)
+        if cook_time_label:
+            # Find the next span element after the label
+            cook_time_element = cook_time_label.find_next('span')
+            if cook_time_element:
+                return cook_time_element.text.strip()
+        return None
     
     def _extract_ingredients(self) -> List[Dict]:
         """

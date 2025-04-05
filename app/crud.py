@@ -119,7 +119,9 @@ def create_recipe(db: Session, recipe: schemas.RecipeCreate) -> models.Recipe:
     db_recipe = models.Recipe(
         name=recipe.name,
         source=recipe.source,
-        rating=recipe.rating
+        rating=recipe.rating,
+        prep_time=recipe.prep_time,
+        cook_time=recipe.cook_time
     )
     
     # Add categories
@@ -181,6 +183,8 @@ def update_recipe(
     db_recipe.name = recipe_data.name
     db_recipe.source = recipe_data.source
     db_recipe.rating = recipe_data.rating
+    db_recipe.prep_time = recipe_data.prep_time
+    db_recipe.cook_time = recipe_data.cook_time
     
     # Update categories
     db_recipe.categories = []
@@ -278,6 +282,8 @@ def import_recipe_from_file(db: Session, file_path: str) -> models.Recipe:
         name=recipe_data["name"],
         source=recipe_data["source"],
         rating=recipe_data["rating"],
+        prep_time=recipe_data.get("prep_time"),
+        cook_time=recipe_data.get("cook_time"),
         categories=recipe_data["categories"],
         ingredients=ingredients,
         directions=directions
