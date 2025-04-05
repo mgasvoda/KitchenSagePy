@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ recipe.name }} - KitchenSage</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="main-header">
+            <div class="logo">
+                <a href="/">
+                    <h1>KitchenSage</h1>
+                </a>
+            </div>
+            <div class="search-container">
+                <form action="/search" method="get" class="search-form">
+                    <input type="text" name="query" placeholder="Search recipes..." class="search-input">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
+        </header>
+
+        <div class="content">
+            <main class="recipe-detail">
+                <div class="recipe-header">
+                    <a href="/" class="back-link">&laquo; Back to Recipes</a>
+                    <h1 class="recipe-title">{{ recipe.name }}</h1>
+                    
+                    {% if recipe.rating > 0 %}
+                        <div class="recipe-rating">
+                            {% for i in range(recipe.rating) %}
+                                <span class="star">★</span>
+                            {% endfor %}
+                            {% for i in range(5 - recipe.rating) %}
+                                <span class="star empty">☆</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    
+                    {% if recipe.source %}
+                        <p class="recipe-source">Source: {{ recipe.source }}</p>
+                    {% endif %}
+                    
+                    {% if recipe.categories %}
+                        <div class="recipe-categories">
+                            {% for category in recipe.categories %}
+                                <a href="/search?category={{ category.name }}" class="category-tag">{{ category.name }}</a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="recipe-content">
+                    <div class="ingredients-section">
+                        <h2>Ingredients</h2>
+                        <ul class="ingredients-list">
+                            {% for ingredient in recipe.ingredients %}
+                                {% if ingredient.is_header %}
+                                    <li class="ingredient-header">{{ ingredient.name }}</li>
+                                {% else %}
+                                    <li class="ingredient">
+                                        {% if ingredient.quantity %}
+                                            <span class="ingredient-quantity">{{ ingredient.quantity }}</span>
+                                        {% endif %}
+                                        {% if ingredient.unit %}
+                                            <span class="ingredient-unit">{{ ingredient.unit }}</span>
+                                        {% endif %}
+                                        <span class="ingredient-name">{{ ingredient.name }}</span>
+                                    </li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    
+                    <div class="directions-section">
+                        <h2>Directions</h2>
+                        <ol class="directions-list">
+                            {% for direction in recipe.directions %}
+                                <li class="direction-step">
+                                    <span class="step-number">{{ direction.step_number }}</span>
+                                    <span class="step-description">{{ direction.description }}</span>
+                                </li>
+                            {% endfor %}
+                        </ol>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <footer class="main-footer">
+            <p>&copy; {{ current_year }} KitchenSage. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>
