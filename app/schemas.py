@@ -1,6 +1,7 @@
  # Pydantic models for request/response validation
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel
+import datetime
 
 
 class IngredientBase(BaseModel):
@@ -19,7 +20,7 @@ class Ingredient(IngredientBase):
     recipe_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class DirectionBase(BaseModel):
@@ -36,7 +37,7 @@ class Direction(DirectionBase):
     recipe_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class CategoryBase(BaseModel):
@@ -51,7 +52,7 @@ class Category(CategoryBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class RecipeBase(BaseModel):
@@ -75,9 +76,43 @@ class Recipe(RecipeBase):
     categories: List[Category] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class RecipeList(BaseModel):
     recipes: List[Recipe]
+    total: int
+
+
+class MealPlanBase(BaseModel):
+    """Base model for meal plans."""
+    name: str
+
+
+class MealPlanCreate(MealPlanBase):
+    """Model for creating a meal plan."""
+    recipe_ids: List[int] = []
+
+
+class MealPlanIngredient(BaseModel):
+    """Model for consolidated ingredients in a meal plan."""
+    name: str
+    quantity: Optional[str] = None
+    unit: Optional[str] = None
+
+
+class MealPlan(MealPlanBase):
+    """Model for meal plan responses."""
+    id: int
+    created_at: datetime.datetime
+    recipes: List[Recipe] = []
+    all_ingredients: List[MealPlanIngredient] = []
+
+    class Config:
+        from_attributes = True
+
+
+class MealPlanList(BaseModel):
+    """Model for paginated meal plan responses."""
+    meal_plans: List[MealPlan]
     total: int

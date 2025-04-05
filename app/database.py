@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from pathlib import Path
 
 # Database URL
-SQLALCHEMY_DATABASE_URL = "sqlite:///./kitchen_sage.db"
+SQLALCHEMY_DATABASE_URL = f"sqlite:///{Path(__file__).parent.parent.absolute()}/kitchen_sage.db"
 
 # Create the engine
 engine = create_engine(

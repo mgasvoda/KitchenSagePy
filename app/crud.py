@@ -395,7 +395,7 @@ def import_recipe_from_file(db: Session, file_path: str) -> models.Recipe:
     
     recipe = schemas.RecipeCreate(
         name=recipe_data["name"],
-        source=recipe_data["source"],
+        source=recipe_data.get("source"),
         rating=recipe_data["rating"],
         prep_time=recipe_data.get("prep_time"),
         cook_time=recipe_data.get("cook_time"),
@@ -406,3 +406,160 @@ def import_recipe_from_file(db: Session, file_path: str) -> models.Recipe:
     
     # Create the recipe in the database
     return create_recipe(db, recipe)
+
+
+# Meal Plan CRUD operations
+
+def get_meal_plan(db: Session, meal_plan_id: int) -> Optional[models.MealPlan]:
+    """
+    Get a meal plan by ID.
+    
+    Args:
+        db: Database session
+        meal_plan_id: ID of the meal plan to retrieve
+        
+    Returns:
+        MealPlan object or None if not found
+    """
+    return db.query(models.MealPlan).filter(models.MealPlan.id == meal_plan_id).first()
+
+
+def get_meal_plans(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    search: Optional[str] = None
+) -> List[models.MealPlan]:
+    """
+    Get all meal plans with optional filtering.
+    
+    Args:
+        db: Database session
+        skip: Number of meal plans to skip (for pagination)
+        limit: Maximum number of meal plans to return
+        search: Optional search term to filter meal plans by name
+        
+    Returns:
+        List of meal plans matching the criteria
+    """
+    query = db.query(models.MealPlan)
+    
+    # Apply search filter if provided
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(models.MealPlan.name.ilike(search_term))
+    
+    # Apply pagination
+    return query.order_by(models.MealPlan.created_at.desc()).offset(skip).limit(limit).all()
+
+
+def count_meal_plans(
+    db: Session,
+    search: Optional[str] = None
+) -> int:
+    """
+    Count the total number of meal plans matching the filters.
+    
+    Args:
+        db: Database session
+        search: Optional search term to filter meal plans by name
+        
+    Returns:
+        Total count of meal plans matching the criteria
+    """
+    query = db.query(models.MealPlan)
+    
+    # Apply search filter if provided
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(models.MealPlan.name.ilike(search_term))
+    
+    return query.count()
+
+
+def create_meal_plan(db: Session, meal_plan: schemas.MealPlanCreate) -> models.MealPlan:
+    """
+    Create a new meal plan with its recipes.
+    
+    Args:
+        db: Database session
+        meal_plan: Meal plan data
+        
+    Returns:
+        Created meal plan
+    """
+    # Create the meal plan
+    db_meal_plan = models.MealPlan(
+        name=meal_plan.name
+    )
+    
+    # Add recipes
+    for recipe_id in meal_plan.recipe_ids:
+        recipe = get_recipe(db, recipe_id)
+        if recipe:
+            db_meal_plan.recipes.append(recipe)
+    
+    # Add the meal plan to the session
+    db.add(db_meal_plan)
+    db.commit()
+    db.refresh(db_meal_plan)
+    
+    return db_meal_plan
+
+
+def update_meal_plan(
+    db: Session,
+    meal_plan_id: int,
+    meal_plan_data: schemas.MealPlanCreate
+) -> Optional[models.MealPlan]:
+    """
+    Update an existing meal plan.
+    
+    Args:
+        db: Database session
+        meal_plan_id: ID of the meal plan to update
+        meal_plan_data: New meal plan data
+        
+    Returns:
+        Updated meal plan or None if meal plan not found
+    """
+    db_meal_plan = get_meal_plan(db, meal_plan_id)
+    if db_meal_plan is None:
+        return None
+    
+    # Update basic meal plan data
+    db_meal_plan.name = meal_plan_data.name
+    
+    # Update recipes
+    db_meal_plan.recipes = []
+    for recipe_id in meal_plan_data.recipe_ids:
+        recipe = get_recipe(db, recipe_id)
+        if recipe:
+            db_meal_plan.recipes.append(recipe)
+    
+    # Commit all changes
+    db.commit()
+    db.refresh(db_meal_plan)
+    
+    return db_meal_plan
+
+
+def delete_meal_plan(db: Session, meal_plan_id: int) -> bool:
+    """
+    Delete a meal plan.
+    
+    Args:
+        db: Database session
+        meal_plan_id: ID of the meal plan to delete
+        
+    Returns:
+        True if meal plan was deleted, False if not found
+    """
+    db_meal_plan = get_meal_plan(db, meal_plan_id)
+    if db_meal_plan is None:
+        return False
+    
+    db.delete(db_meal_plan)
+    db.commit()
+    
+    return True

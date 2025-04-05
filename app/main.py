@@ -10,7 +10,7 @@ import math
 
 from . import crud, models, schemas
 from .database import get_db, init_db
-from .routes import recipes
+from .routes import recipes, meal_plans
 
 # Initialize FastAPI app
 app = FastAPI(title="KitchenSage")
@@ -23,6 +23,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 # Include API routes
 app.include_router(recipes.router)
+app.include_router(meal_plans.router)
 
 # Initialize database
 init_db()
