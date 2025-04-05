@@ -15,4 +15,8 @@ uv.lock
 # Git
 .git/
 
+# Dev files
 dev/**
+
+# Database files
+**.db
