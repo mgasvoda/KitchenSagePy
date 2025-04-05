@@ -20,3 +20,7 @@ dev/**
 
 # Database files
 **.db
+
+
+agent/fastagent.secrets.yaml
+
