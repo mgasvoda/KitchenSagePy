@@ -66,28 +66,24 @@ def get_categories(ctx: Context) -> List[mcp_models.CategoryModel]:
 @mcp.tool()
 def update_meal_plan(
     ctx: Context, 
-    meal_plan_id: Optional[int] = None,
-    request: mcp_models.MealPlanUpdateRequest = None,
-    # Individual parameters for backward compatibility and convenience
-    name: Optional[str] = None,
-    recipe_ids: Optional[List[int]] = None,
-    categories: Optional[List[str]] = None,
-    update_categories_only: bool = False
+    meal_plan_id: Optional[int] = Field(
+        default=None,
+        description="The ID of the meal plan to update. If null/None, a new meal plan will be created."
+    ),
+    request: mcp_models.MealPlanUpdateRequest = Field(
+        description="An object containing the details for the meal plan update or creation. See the MealPlanUpdateRequest schema for full details of each field."
+    )
 ) -> Optional[mcp_models.MealPlanModel]:
     """
     Create or update a meal plan with recipes and categories.
     
-    This function combines the functionality of create_meal_plan and update_meal_plan_categories.
+    This function creates a new meal plan or updates an existing one based on the provided request object.
     If meal_plan_id is provided, it updates an existing meal plan; otherwise, it creates a new one.
     
     Args:
         ctx: MCP context
         meal_plan_id: ID of the meal plan to update (None for create)
-        request: Meal plan update request object (alternative to individual parameters)
-        name: Name of the meal plan
-        recipe_ids: List of recipe IDs to include in the meal plan
-        categories: List of category names to assign to the meal plan
-        update_categories_only: If true, only update the categories
+        request: Meal plan update request object containing name, recipe_ids, categories, and update flags
         
     Returns:
         Created or updated meal plan, or None if update fails
@@ -96,12 +92,11 @@ def update_meal_plan(
     db = SessionLocal()
     
     try:
-        # Use request object if provided, otherwise use individual parameters
-        if request is not None:
-            name = request.name if name is None else name
-            recipe_ids = request.recipe_ids if recipe_ids is None else recipe_ids
-            categories = request.categories if categories is None else categories
-            update_categories_only = request.update_categories_only if update_categories_only is False else update_categories_only
+        # Extract values from request object
+        name = request.name
+        recipe_ids = request.recipe_ids
+        categories = request.categories
+        update_categories_only = request.update_categories_only
         
         # Handle categories-only update
         if meal_plan_id is not None and update_categories_only:
@@ -164,38 +159,24 @@ def update_meal_plan(
 @mcp.tool()
 def update_recipe(
     ctx: Context, 
-    recipe_id: Optional[int] = None,
-    request: mcp_models.RecipeUpdateRequest = None,
-    # Individual parameters for backward compatibility and convenience
-    name: Optional[str] = None,
-    source: Optional[str] = None,
-    rating: Optional[int] = None,
-    prep_time: Optional[str] = None,
-    cook_time: Optional[str] = None,
-    categories: Optional[List[str]] = None,
-    ingredients: Optional[List[mcp_models.IngredientCreateModel]] = None,
-    directions: Optional[List[mcp_models.DirectionCreateModel]] = None,
-    update_categories_only: bool = False
+    recipe_id: Optional[int] = Field(
+        default=None,
+        description="The ID of the recipe to update. If null/None, a new recipe will be created."
+    ),
+    request: mcp_models.RecipeUpdateRequest = Field(
+        description="An object containing the details for the recipe update or creation. See the RecipeUpdateRequest schema for full details of each field."
+    )
 ) -> Optional[mcp_models.RecipeModel]:
     """
     Create or update a recipe with ingredients, directions, and categories.
     
-    This function combines the functionality of create_recipe and update_recipe_categories.
+    This function creates a new recipe or updates an existing one based on the provided request object.
     If recipe_id is provided, it updates an existing recipe; otherwise, it creates a new one.
     
     Args:
         ctx: MCP context
         recipe_id: ID of the recipe to update (None for create)
-        request: Recipe update request object (alternative to individual parameters)
-        name: Name of the recipe
-        source: Source of the recipe (e.g., website, cookbook)
-        rating: Rating of the recipe (0-5)
-        prep_time: Preparation time (e.g., '10 minutes')
-        cook_time: Cooking time (e.g., '30 minutes')
-        categories: List of category names for the recipe
-        ingredients: List of ingredients with quantity, unit, name, and is_header flag
-        directions: List of directions with step_number and description
-        update_categories_only: If true, only update the categories
+        request: Recipe update request object containing name, source, rating, times, categories, ingredients, and directions
         
     Returns:
         Created or updated recipe, or None if update fails
@@ -204,17 +185,16 @@ def update_recipe(
     db = SessionLocal()
     
     try:
-        # Use request object if provided, otherwise use individual parameters
-        if request is not None:
-            name = request.name if name is None else name
-            source = request.source if source is None else source
-            rating = request.rating if rating is None else rating
-            prep_time = request.prep_time if prep_time is None else prep_time
-            cook_time = request.cook_time if cook_time is None else cook_time
-            categories = request.categories if categories is None else categories
-            ingredients = request.ingredients if ingredients is None else ingredients
-            directions = request.directions if directions is None else directions
-            update_categories_only = request.update_categories_only if update_categories_only is False else update_categories_only
+        # Extract values from request object
+        name = request.name
+        source = request.source
+        rating = request.rating
+        prep_time = request.prep_time
+        cook_time = request.cook_time
+        categories = request.categories
+        ingredients = request.ingredients
+        directions = request.directions
+        update_categories_only = request.update_categories_only
         
         # Handle categories-only update
         if recipe_id is not None and update_categories_only:
@@ -289,34 +269,24 @@ def update_recipe(
 @mcp.tool()
 def get_recipes(
     ctx: Context,
-    id: Optional[int] = None,
-    name: Optional[str] = None,
-    ingredient: Optional[str] = None,
-    category: Optional[str] = None,
-    max_total_time: Optional[int] = None,
-    skip: int = 0,
-    limit: int = 10,
-    columns: List[str] = ["id", "name", "rating", "prep_time", "cook_time", "ingredients", "directions", "categories", "description", "notes"]
+    request: mcp_models.RecipeGetRequest = Field(
+        description="An object containing the search parameters and column selection options. See the RecipeGetRequest schema for full details of each field."
+    )
 ) -> mcp_models.RecipeGetResponse:
     """
     Get recipes with flexible filtering and column selection.
     
-    This function combines search functionality with the ability to select
+    This function allows searching for recipes with various filters and selecting
     which columns are returned in the response. It can be used to:
     1. Get a specific recipe by ID
-    2. Search recipes by name, ingredient, category, or time
-    3. Control which fields are returned in the response
+    2. Search recipes by name or source
+    3. Filter recipes by ingredient
+    4. Filter recipes by category
+    5. Filter recipes by total time
     
     Args:
         ctx: MCP context
-        id: Recipe ID to fetch a specific recipe
-        name: Search term for recipe name or source
-        ingredient: Ingredient to search for
-        category: Category to filter by
-        max_total_time: Maximum total time (prep + cook) in minutes
-        skip: Number of recipes to skip (for pagination)
-        limit: Maximum number of recipes to return
-        columns: List of columns to include in the response
+        request: Recipe get request object containing search parameters and column selection options
         
     Returns:
         List of recipes matching the criteria with selected columns and total count
@@ -325,30 +295,30 @@ def get_recipes(
     db = SessionLocal()
     
     try:
-        if id is not None:
+        if request.id is not None:
             # Get a specific recipe by ID
-            recipe = crud.get_recipe(db, recipe_id=id)
+            recipe = crud.get_recipe(db, recipe_id=request.id)
             recipes = [recipe] if recipe else []
             total = 1 if recipe else 0
         else:
             # Search for recipes with filters
             recipes = crud.get_recipes(
                 db=db,
-                skip=skip,
-                limit=limit,
-                search=name,
-                category=category,
-                ingredient=ingredient,
-                max_total_time=max_total_time
+                skip=request.skip,
+                limit=request.limit,
+                search=request.name,
+                ingredient=request.ingredient,
+                category=request.category,
+                max_total_time=request.max_total_time
             )
             
             # Get the total count
             total = crud.count_recipes(
                 db=db,
-                search=name,
-                category=category,
-                ingredient=ingredient,
-                max_total_time=max_total_time
+                search=request.name,
+                ingredient=request.ingredient,
+                category=request.category,
+                max_total_time=request.max_total_time
             )
         
         # Create dynamic models with only the requested columns
@@ -360,24 +330,24 @@ def get_recipes(
             recipe_dict = {}
             
             # Add basic fields if requested
-            for field in columns:
+            for field in request.columns:
                 if field in ["id", "name", "source", "rating", "prep_time", "cook_time", "description", "notes"]:
                     recipe_dict[field] = getattr(recipe, field, None)
             
             # Add related fields if requested
-            if "ingredients" in columns and hasattr(recipe, "ingredients"):
+            if "ingredients" in request.columns and hasattr(recipe, "ingredients"):
                 recipe_dict["ingredients"] = [
                     mcp_models.IngredientModel.model_validate(ingredient)
                     for ingredient in recipe.ingredients
                 ]
             
-            if "directions" in columns and hasattr(recipe, "directions"):
+            if "directions" in request.columns and hasattr(recipe, "directions"):
                 recipe_dict["directions"] = [
                     mcp_models.DirectionModel.model_validate(direction)
                     for direction in recipe.directions
                 ]
             
-            if "categories" in columns and hasattr(recipe, "categories"):
+            if "categories" in request.columns and hasattr(recipe, "categories"):
                 recipe_dict["categories"] = [
                     mcp_models.CategoryModel.model_validate(category)
                     for category in recipe.categories
@@ -394,18 +364,14 @@ def get_recipes(
 @mcp.tool()
 def get_meal_plans(
     ctx: Context,
-    id: Optional[int] = None,
-    name: Optional[str] = None,
-    skip: int = 0,
-    limit: int = 10,
-    columns: List[str] = ["id", "name", "created_at", "categories", "recipes", "all_ingredients"],
-    include_recipes: bool = False,
-    include_ingredients: bool = False
+    request: mcp_models.MealPlanGetRequest = Field(
+        description="An object containing the search parameters and column selection options. See the MealPlanGetRequest schema for full details of each field."
+    )
 ) -> mcp_models.MealPlanGetResponse:
     """
     Get meal plans with flexible filtering and column selection.
     
-    This function combines search functionality with the ability to select
+    This function allows searching for meal plans with various filters and selecting
     which columns are returned in the response. It can be used to:
     1. Get a specific meal plan by ID
     2. Search meal plans by name
@@ -414,13 +380,7 @@ def get_meal_plans(
     
     Args:
         ctx: MCP context
-        id: Meal plan ID to fetch a specific meal plan
-        name: Search term for meal plan name
-        skip: Number of meal plans to skip (for pagination)
-        limit: Maximum number of meal plans to return
-        columns: List of columns to include in the response
-        include_recipes: Whether to include recipes in the response
-        include_ingredients: Whether to include consolidated ingredients in the response
+        request: Meal plan get request object containing search parameters and column selection options
         
     Returns:
         List of meal plans matching the criteria with selected columns and total count
@@ -429,24 +389,24 @@ def get_meal_plans(
     db = SessionLocal()
     
     try:
-        if id is not None:
+        if request.id is not None:
             # Get a specific meal plan by ID
-            meal_plan = crud.get_meal_plan(db, meal_plan_id=id)
+            meal_plan = crud.get_meal_plan(db, meal_plan_id=request.id)
             meal_plans = [meal_plan] if meal_plan else []
             total = 1 if meal_plan else 0
         else:
             # Search for meal plans with filters
             meal_plans = crud.get_meal_plans(
                 db=db,
-                skip=skip,
-                limit=limit,
-                search=name
+                skip=request.skip,
+                limit=request.limit,
+                search=request.name
             )
             
             # Get the total count
             total = crud.count_meal_plans(
                 db=db,
-                search=name
+                search=request.name
             )
         
         # Create dynamic models with only the requested columns
@@ -458,19 +418,19 @@ def get_meal_plans(
             meal_plan_dict = {}
             
             # Add basic fields if requested
-            for field in columns:
+            for field in request.columns:
                 if field in ["id", "name", "created_at"]:
                     meal_plan_dict[field] = getattr(meal_plan, field, None)
             
             # Add categories if requested
-            if "categories" in columns and hasattr(meal_plan, "categories"):
+            if "categories" in request.columns and hasattr(meal_plan, "categories"):
                 meal_plan_dict["categories"] = [
                     mcp_models.CategoryModel.model_validate(category)
                     for category in meal_plan.categories
                 ]
             
             # Add recipes if requested
-            if "recipes" in columns and include_recipes and hasattr(meal_plan, "recipes"):
+            if "recipes" in request.columns and request.include_recipes and hasattr(meal_plan, "recipes"):
                 recipe_list = []
                 for recipe in meal_plan.recipes:
                     recipe_dict = {
@@ -483,7 +443,7 @@ def get_meal_plans(
                     }
                     
                     # Include ingredients if requested
-                    if include_ingredients and hasattr(recipe, "ingredients"):
+                    if request.include_ingredients and hasattr(recipe, "ingredients"):
                         recipe_dict["ingredients"] = [
                             mcp_models.IngredientModel.model_validate(ingredient)
                             for ingredient in recipe.ingredients
@@ -501,7 +461,7 @@ def get_meal_plans(
                 meal_plan_dict["recipes"] = recipe_list
             
             # Add consolidated ingredients if requested
-            if "all_ingredients" in columns and include_ingredients and hasattr(meal_plan, "all_ingredients"):
+            if "all_ingredients" in request.columns and request.include_ingredients and hasattr(meal_plan, "all_ingredients"):
                 meal_plan_dict["all_ingredients"] = [
                     mcp_models.MealPlanIngredientModel(**ingredient)
                     for ingredient in meal_plan.all_ingredients
