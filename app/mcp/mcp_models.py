@@ -83,11 +83,6 @@ class MealPlanUpdateRequest(BaseModel):
     recipe_ids: List[int] = Field([], description="List of recipe IDs to include in the meal plan")
 
 
-class RecipeCategoryUpdateRequest(BaseModel):
-    """Request model for updating recipe categories."""
-    categories: List[str] = Field([], description="List of category names to assign to the recipe")
-
-
 class MealPlanCategoryUpdateRequest(BaseModel):
     """Request model for updating meal plan categories."""
     categories: List[str] = Field([], description="List of category names to assign to the meal plan")
@@ -117,6 +112,19 @@ class RecipeCreateRequest(BaseModel):
     categories: List[str] = Field([], description="List of category names for the recipe")
     ingredients: List[IngredientCreateModel] = Field([], description="List of ingredients for the recipe")
     directions: List[DirectionCreateModel] = Field([], description="List of directions for the recipe")
+
+
+class RecipeUpdateRequest(BaseModel):
+    """Request model for updating a recipe."""
+    name: Optional[str] = Field(None, description="Name of the recipe")
+    source: Optional[str] = Field(None, description="Source of the recipe")
+    rating: Optional[int] = Field(None, description="Rating of the recipe (0-5)")
+    prep_time: Optional[str] = Field(None, description="Preparation time (e.g., '10 minutes')")
+    cook_time: Optional[str] = Field(None, description="Cooking time (e.g., '30 minutes')")
+    categories: Optional[List[str]] = Field(None, description="List of category names for the recipe")
+    ingredients: Optional[List[IngredientCreateModel]] = Field(None, description="List of ingredients for the recipe")
+    directions: Optional[List[DirectionCreateModel]] = Field(None, description="List of directions for the recipe")
+    update_categories_only: bool = Field(False, description="If true, only update the categories")
 
 
 # Models for the simplified getters

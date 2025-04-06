@@ -166,43 +166,6 @@ def delete_meal_plan(ctx: Context, meal_plan_id: int) -> bool:
         db.close()
 
 @mcp.tool()
-def update_recipe_categories(
-    ctx: Context, 
-    recipe_id: int,
-    categories: List[str] = Field(default_factory=list, description="List of category names to assign to the recipe")
-) -> Optional[mcp_models.RecipeModel]:
-    """
-    Update the categories of an existing recipe.
-    
-    Args:
-        ctx: MCP context
-        recipe_id: ID of the recipe to update
-        categories: List of category names to assign to the recipe
-        
-    Returns:
-        Updated recipe or None if not found
-    """
-    # Create a new database session
-    db = SessionLocal()
-    
-    try:
-        # Update the recipe categories
-        recipe = crud.update_recipe_categories(
-            db, 
-            recipe_id=recipe_id, 
-            categories=categories
-        )
-        
-        if recipe is None:
-            return None
-        
-        # Return the updated recipe
-        return mcp_models.RecipeModel.model_validate(recipe)
-    finally:
-        db.close()
-
-
-@mcp.tool()
 def update_meal_plan_categories(
     ctx: Context, 
     meal_plan_id: int,
@@ -240,22 +203,31 @@ def update_meal_plan_categories(
 
 
 @mcp.tool()
-def create_recipe(
+def update_recipe(
     ctx: Context, 
-    name: str,
+    recipe_id: Optional[int] = None,
+    request: mcp_models.RecipeUpdateRequest = None,
+    # Individual parameters for backward compatibility and convenience
+    name: Optional[str] = None,
     source: Optional[str] = None,
-    rating: int = 0,
+    rating: Optional[int] = None,
     prep_time: Optional[str] = None,
     cook_time: Optional[str] = None,
-    categories: List[str] = Field(default_factory=list, description="List of category names for the recipe"),
-    ingredients: List[mcp_models.IngredientCreateModel] = Field(default_factory=list, description="List of ingredients for the recipe"),
-    directions: List[mcp_models.DirectionCreateModel] = Field(default_factory=list, description="List of directions for the recipe")
-) -> mcp_models.RecipeModel:
+    categories: Optional[List[str]] = None,
+    ingredients: Optional[List[mcp_models.IngredientCreateModel]] = None,
+    directions: Optional[List[mcp_models.DirectionCreateModel]] = None,
+    update_categories_only: bool = False
+) -> Optional[mcp_models.RecipeModel]:
     """
-    Create a new recipe with ingredients, directions, and categories.
+    Create or update a recipe with ingredients, directions, and categories.
+    
+    This function combines the functionality of create_recipe and update_recipe_categories.
+    If recipe_id is provided, it updates an existing recipe; otherwise, it creates a new one.
     
     Args:
         ctx: MCP context
+        recipe_id: ID of the recipe to update (None for create)
+        request: Recipe update request object (alternative to individual parameters)
         name: Name of the recipe
         source: Source of the recipe (e.g., website, cookbook)
         rating: Rating of the recipe (0-5)
@@ -264,47 +236,92 @@ def create_recipe(
         categories: List of category names for the recipe
         ingredients: List of ingredients with quantity, unit, name, and is_header flag
         directions: List of directions with step_number and description
+        update_categories_only: If true, only update the categories
         
     Returns:
-        Created recipe
+        Created or updated recipe, or None if update fails
     """
     # Create a new database session
     db = SessionLocal()
     
     try:
-        # Convert MCP models to schema models
-        schema_ingredients = [
-            schemas.IngredientCreate(
-                quantity=ingredient.quantity,
-                unit=ingredient.unit,
-                name=ingredient.name,
-                is_header=ingredient.is_header
-            ) for ingredient in ingredients
-        ]
+        # Use request object if provided, otherwise use individual parameters
+        if request is not None:
+            name = request.name if name is None else name
+            source = request.source if source is None else source
+            rating = request.rating if rating is None else rating
+            prep_time = request.prep_time if prep_time is None else prep_time
+            cook_time = request.cook_time if cook_time is None else cook_time
+            categories = request.categories if categories is None else categories
+            ingredients = request.ingredients if ingredients is None else ingredients
+            directions = request.directions if directions is None else directions
+            update_categories_only = request.update_categories_only if update_categories_only is False else update_categories_only
         
-        schema_directions = [
-            schemas.DirectionCreate(
-                step_number=direction.step_number,
-                description=direction.description
-            ) for direction in directions
-        ]
+        # Handle categories-only update
+        if recipe_id is not None and update_categories_only:
+            if categories is None:
+                categories = []
+            recipe = crud.update_recipe_categories(
+                db, 
+                recipe_id=recipe_id, 
+                categories=categories
+            )
+            
+            if recipe is None:
+                return None
+            
+            # Return the updated recipe
+            return mcp_models.RecipeModel.model_validate(recipe)
         
-        # Create recipe schema from request
+        # For full update or create, we need all the required fields
+        if recipe_id is None and name is None:
+            raise ValueError("Name is required when creating a new recipe")
+        
+        # Convert MCP models to schema models for ingredients and directions
+        schema_ingredients = []
+        if ingredients is not None:
+            schema_ingredients = [
+                schemas.IngredientCreate(
+                    quantity=ingredient.quantity,
+                    unit=ingredient.unit,
+                    name=ingredient.name,
+                    is_header=ingredient.is_header
+                ) for ingredient in ingredients
+            ]
+        
+        schema_directions = []
+        if directions is not None:
+            schema_directions = [
+                schemas.DirectionCreate(
+                    step_number=direction.step_number,
+                    description=direction.description
+                ) for direction in directions
+            ]
+        
+        # Create recipe schema
         recipe_schema = schemas.RecipeCreate(
-            name=name,
+            name=name if name is not None else "",
             source=source,
-            rating=rating,
+            rating=rating if rating is not None else 0,
             prep_time=prep_time,
             cook_time=cook_time,
-            categories=categories,
+            categories=categories if categories is not None else [],
             ingredients=schema_ingredients,
             directions=schema_directions
         )
         
-        # Create the recipe
-        recipe = crud.create_recipe(db, recipe=recipe_schema)
+        # Create or update the recipe
+        if recipe_id is None:
+            # Create new recipe
+            recipe = crud.create_recipe(db, recipe=recipe_schema)
+        else:
+            # Update existing recipe
+            recipe = crud.update_recipe(db, recipe_id=recipe_id, recipe_data=recipe_schema)
+            
+            if recipe is None:
+                return None
         
-        # Return the created recipe
+        # Return the created/updated recipe
         return mcp_models.RecipeModel.model_validate(recipe)
     finally:
         db.close()
