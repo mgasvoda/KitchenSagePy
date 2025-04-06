@@ -23,4 +23,5 @@ dev/**
 
 
 agent/fastagent.secrets.yaml
+agent/fastagent.jsonl
 
