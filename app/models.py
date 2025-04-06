@@ -43,6 +43,8 @@ class Recipe(Base):
     rating = Column(Integer, default=0)
     prep_time = Column(String(50), nullable=True)
     cook_time = Column(String(50), nullable=True)
+    description = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
     
     # Relationships
     ingredients = relationship("Ingredient", back_populates="recipe", cascade="all, delete-orphan")
