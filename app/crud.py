@@ -7,8 +7,6 @@ from fuzzywuzzy import process, fuzz
 import re
 
 from . import models, schemas
-from .scrapers.paprika_scraper import scrape_recipe_from_file
-
 
 def get_category_by_name(db: Session, name: str) -> Optional[models.Category]:
     """Get a category by name or create it if it doesn't exist."""
@@ -477,56 +475,7 @@ def delete_recipe(db: Session, recipe_id: int) -> bool:
     return True
 
 
-def import_recipe_from_file(db: Session, file_path: str) -> models.Recipe:
-    """
-    Import a recipe from a Paprika HTML file.
-    
-    Args:
-        db: Database session
-        file_path: Path to the HTML file
-        
-    Returns:
-        Imported recipe
-    """
-    # Scrape the recipe data from the file
-    recipe_data = scrape_recipe_from_file(file_path)
-    
-    # Convert to RecipeCreate schema
-    ingredients = []
-    for i, ingredient in enumerate(recipe_data["ingredients"]):
-        if ingredient["type"] == "header":
-            ingredients.append(schemas.IngredientCreate(
-                name=ingredient["text"],
-                is_header=1
-            ))
-        else:
-            ingredients.append(schemas.IngredientCreate(
-                quantity=ingredient["quantity"],
-                unit=ingredient["unit"],
-                name=ingredient["name"]
-            ))
-    
-    directions = []
-    for i, direction in enumerate(recipe_data["directions"]):
-        directions.append(schemas.DirectionCreate(
-            step_number=i+1,
-            description=direction
-        ))
-    
-    recipe = schemas.RecipeCreate(
-        name=recipe_data["name"],
-        source=recipe_data.get("source"),
-        rating=recipe_data["rating"],
-        prep_time=recipe_data.get("prep_time"),
-        cook_time=recipe_data.get("cook_time"),
-        categories=recipe_data["categories"],
-        ingredients=ingredients,
-        directions=directions
-    )
-    
-    # Create the recipe in the database
-    return create_recipe(db, recipe)
-
+# The import_recipe_from_file function has been moved to dev/import_recipe.py
 
 # Meal Plan CRUD operations
 

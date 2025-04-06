@@ -10,7 +10,7 @@ This script:
 import os
 import sys
 from pathlib import Path
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -30,16 +30,53 @@ def reset_database() -> None:
     """
     Drop all tables and recreate them based on the models.
     """
-    print("Dropping all tables...")
-    Base.metadata.drop_all(bind=engine)
+    # Since the database might be locked by another process (like the MCP server),
+    # we'll use a different approach to update the schema
     
-    print("Creating all tables...")
-    Base.metadata.create_all(bind=engine)
+    # First, check if the database exists
+    db_path = Path(__file__).parent.parent / "kitchensage.db"
+    if not db_path.exists():
+        print("No existing database file found. Creating new database.")
+        Base.metadata.create_all(bind=engine)
+    else:
+        print("Existing database found. Checking schema...")
+        
+        # Check if we need to update the schema
+        inspector = inspect(engine)
+        
+        # Check if recipes table exists
+        if "recipes" in inspector.get_table_names():
+            # Get existing columns in recipes table
+            existing_columns = [col["name"] for col in inspector.get_columns("recipes")]
+            
+            # Check if new columns are missing
+            missing_columns = []
+            for column_name in ["description", "notes"]:
+                if column_name not in existing_columns:
+                    missing_columns.append(column_name)
+            
+            if missing_columns:
+                print(f"Missing columns in recipes table: {missing_columns}")
+                print("Updating schema...")
+                
+                # Create a connection and begin a transaction
+                with engine.begin() as connection:
+                    for column_name in missing_columns:
+                        # Add the missing column
+                        # SQLite has limited ALTER TABLE support, but adding columns is supported
+                        connection.execute(text(f"ALTER TABLE recipes ADD COLUMN {column_name} TEXT"))
+                
+                print("Schema updated successfully.")
+            else:
+                print("Schema is up to date.")
+        else:
+            print("Recipes table not found. Creating all tables...")
+            Base.metadata.create_all(bind=engine)
     
-    # Verify tables after creation
+    # Verify tables after creation/update
     inspector = inspect(engine)
     tables = inspector.get_table_names()
-    print("\nAvailable tables after creation:")
+    print("\nAvailable tables:")
     for table in tables:
         print(f"- {table}")
         columns = inspector.get_columns(table)
@@ -79,6 +116,8 @@ def create_sample_data(db: Session) -> None:
             "rating": 5,
             "prep_time": "10 minutes",
             "cook_time": "15 minutes",
+            "description": "Fluffy homemade pancakes perfect for breakfast or brunch.",
+            "notes": "Serve with maple syrup and fresh berries for the best experience.",
             "categories": [categories[0], categories[4]],  # Breakfast, Vegetarian
             "ingredients": [
                 {"name": "Flour", "quantity": "2", "unit": "cups"},
@@ -100,6 +139,8 @@ def create_sample_data(db: Session) -> None:
             "rating": 4,
             "prep_time": "15 minutes",
             "cook_time": "20 minutes",
+            "description": "Classic Italian pasta dish with eggs, cheese, and bacon.",
+            "notes": "Use freshly grated Parmesan for the best flavor.",
             "categories": [categories[1], categories[2]],  # Lunch, Dinner
             "ingredients": [
                 {"name": "Spaghetti", "quantity": "1", "unit": "pound"},
@@ -121,6 +162,8 @@ def create_sample_data(db: Session) -> None:
             "rating": 5,
             "prep_time": "20 minutes",
             "cook_time": "12 minutes",
+            "description": "Classic chocolate chip cookies with a soft center and crisp edges.",
+            "notes": "For best results, chill the dough for at least 1 hour before baking.",
             "categories": [categories[3]],  # Dessert
             "ingredients": [
                 {"name": "Flour", "quantity": "2.25", "unit": "cups"},
@@ -145,7 +188,9 @@ def create_sample_data(db: Session) -> None:
             source=recipe_data["source"],
             rating=recipe_data["rating"],
             prep_time=recipe_data["prep_time"],
-            cook_time=recipe_data["cook_time"]
+            cook_time=recipe_data["cook_time"],
+            description=recipe_data["description"],
+            notes=recipe_data["notes"]
         )
         
         # Add categories

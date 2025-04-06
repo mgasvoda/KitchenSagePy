@@ -16,7 +16,7 @@ import traceback
 # Handle imports for both direct execution and module import
 try:
     # Try relative imports first (when imported as a module)
-    from .. import models, crud, schemas
+    from .. import models, crud
     from ..database import SessionLocal, engine
     import mcp_models
 except ImportError:
@@ -25,7 +25,7 @@ except ImportError:
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
-    from app import models, crud, schemas
+    from app import models, crud
     from app.database import SessionLocal, engine
     from app.mcp import mcp_models
 
@@ -289,7 +289,14 @@ def update_recipe(
 @mcp.tool()
 def get_recipes(
     ctx: Context,
-    request: mcp_models.RecipeGetRequest
+    id: Optional[int] = None,
+    name: Optional[str] = None,
+    ingredient: Optional[str] = None,
+    category: Optional[str] = None,
+    max_total_time: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 10,
+    columns: List[str] = ["id", "name", "rating", "prep_time", "cook_time", "ingredients", "directions", "categories", "description", "notes"]
 ) -> mcp_models.RecipeGetResponse:
     """
     Get recipes with flexible filtering and column selection.
@@ -302,7 +309,14 @@ def get_recipes(
     
     Args:
         ctx: MCP context
-        request: Recipe get request with filtering options and column selection
+        id: Recipe ID to fetch a specific recipe
+        name: Search term for recipe name or source
+        ingredient: Ingredient to search for
+        category: Category to filter by
+        max_total_time: Maximum total time (prep + cook) in minutes
+        skip: Number of recipes to skip (for pagination)
+        limit: Maximum number of recipes to return
+        columns: List of columns to include in the response
         
     Returns:
         List of recipes matching the criteria with selected columns and total count
@@ -311,56 +325,59 @@ def get_recipes(
     db = SessionLocal()
     
     try:
-        if request.id is not None:
+        if id is not None:
             # Get a specific recipe by ID
-            recipe = crud.get_recipe(db, recipe_id=request.id)
+            recipe = crud.get_recipe(db, recipe_id=id)
             recipes = [recipe] if recipe else []
             total = 1 if recipe else 0
         else:
             # Search for recipes with filters
             recipes = crud.get_recipes(
                 db=db,
-                skip=request.skip,
-                limit=request.limit,
-                search=request.name,
-                category=request.category,
-                ingredient=request.ingredient,
-                max_total_time=request.max_total_time
+                skip=skip,
+                limit=limit,
+                search=name,
+                category=category,
+                ingredient=ingredient,
+                max_total_time=max_total_time
             )
             
             # Get the total count
             total = crud.count_recipes(
                 db=db,
-                search=request.name,
-                category=request.category,
-                ingredient=request.ingredient,
-                max_total_time=request.max_total_time
+                search=name,
+                category=category,
+                ingredient=ingredient,
+                max_total_time=max_total_time
             )
         
         # Create dynamic models with only the requested columns
         dynamic_recipes = []
         for recipe in recipes:
+            if recipe is None:
+                continue
+                
             recipe_dict = {}
             
             # Add basic fields if requested
-            for field in request.columns:
+            for field in columns:
                 if field in ["id", "name", "source", "rating", "prep_time", "cook_time", "description", "notes"]:
                     recipe_dict[field] = getattr(recipe, field, None)
             
             # Add related fields if requested
-            if "ingredients" in request.columns:
+            if "ingredients" in columns and hasattr(recipe, "ingredients"):
                 recipe_dict["ingredients"] = [
                     mcp_models.IngredientModel.model_validate(ingredient)
                     for ingredient in recipe.ingredients
                 ]
             
-            if "directions" in request.columns:
+            if "directions" in columns and hasattr(recipe, "directions"):
                 recipe_dict["directions"] = [
                     mcp_models.DirectionModel.model_validate(direction)
                     for direction in recipe.directions
                 ]
             
-            if "categories" in request.columns:
+            if "categories" in columns and hasattr(recipe, "categories"):
                 recipe_dict["categories"] = [
                     mcp_models.CategoryModel.model_validate(category)
                     for category in recipe.categories
@@ -377,7 +394,13 @@ def get_recipes(
 @mcp.tool()
 def get_meal_plans(
     ctx: Context,
-    request: mcp_models.MealPlanGetRequest
+    id: Optional[int] = None,
+    name: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 10,
+    columns: List[str] = ["id", "name", "created_at", "categories", "recipes", "all_ingredients"],
+    include_recipes: bool = False,
+    include_ingredients: bool = False
 ) -> mcp_models.MealPlanGetResponse:
     """
     Get meal plans with flexible filtering and column selection.
@@ -391,7 +414,13 @@ def get_meal_plans(
     
     Args:
         ctx: MCP context
-        request: Meal plan get request with filtering options and column selection
+        id: Meal plan ID to fetch a specific meal plan
+        name: Search term for meal plan name
+        skip: Number of meal plans to skip (for pagination)
+        limit: Maximum number of meal plans to return
+        columns: List of columns to include in the response
+        include_recipes: Whether to include recipes in the response
+        include_ingredients: Whether to include consolidated ingredients in the response
         
     Returns:
         List of meal plans matching the criteria with selected columns and total count
@@ -400,52 +429,79 @@ def get_meal_plans(
     db = SessionLocal()
     
     try:
-        if request.id is not None:
+        if id is not None:
             # Get a specific meal plan by ID
-            meal_plan = crud.get_meal_plan(db, meal_plan_id=request.id)
+            meal_plan = crud.get_meal_plan(db, meal_plan_id=id)
             meal_plans = [meal_plan] if meal_plan else []
             total = 1 if meal_plan else 0
         else:
             # Search for meal plans with filters
             meal_plans = crud.get_meal_plans(
                 db=db,
-                skip=request.skip,
-                limit=request.limit,
-                search=request.name
+                skip=skip,
+                limit=limit,
+                search=name
             )
             
             # Get the total count
             total = crud.count_meal_plans(
                 db=db,
-                search=request.name
+                search=name
             )
         
         # Create dynamic models with only the requested columns
         dynamic_meal_plans = []
         for meal_plan in meal_plans:
+            if meal_plan is None:
+                continue
+                
             meal_plan_dict = {}
             
             # Add basic fields if requested
-            for field in request.columns:
+            for field in columns:
                 if field in ["id", "name", "created_at"]:
                     meal_plan_dict[field] = getattr(meal_plan, field, None)
             
             # Add categories if requested
-            if "categories" in request.columns:
+            if "categories" in columns and hasattr(meal_plan, "categories"):
                 meal_plan_dict["categories"] = [
                     mcp_models.CategoryModel.model_validate(category)
                     for category in meal_plan.categories
                 ]
             
             # Add recipes if requested
-            if request.include_recipes:
-                meal_plan_dict["recipes"] = [
-                    mcp_models.RecipeModel.model_validate(recipe)
-                    for recipe in meal_plan.recipes
-                ]
+            if "recipes" in columns and include_recipes and hasattr(meal_plan, "recipes"):
+                recipe_list = []
+                for recipe in meal_plan.recipes:
+                    recipe_dict = {
+                        "id": recipe.id,
+                        "name": recipe.name,
+                        "source": recipe.source,
+                        "rating": recipe.rating,
+                        "prep_time": recipe.prep_time,
+                        "cook_time": recipe.cook_time
+                    }
+                    
+                    # Include ingredients if requested
+                    if include_ingredients and hasattr(recipe, "ingredients"):
+                        recipe_dict["ingredients"] = [
+                            mcp_models.IngredientModel.model_validate(ingredient)
+                            for ingredient in recipe.ingredients
+                        ]
+                    
+                    # Include categories if requested
+                    if hasattr(recipe, "categories"):
+                        recipe_dict["categories"] = [
+                            mcp_models.CategoryModel.model_validate(category)
+                            for category in recipe.categories
+                        ]
+                    
+                    recipe_list.append(mcp_models.RecipeModel.model_validate(recipe_dict))
+                
+                meal_plan_dict["recipes"] = recipe_list
             
             # Add consolidated ingredients if requested
-            if request.include_ingredients:
+            if "all_ingredients" in columns and include_ingredients and hasattr(meal_plan, "all_ingredients"):
                 meal_plan_dict["all_ingredients"] = [
                     mcp_models.MealPlanIngredientModel(**ingredient)
                     for ingredient in meal_plan.all_ingredients
