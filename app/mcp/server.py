@@ -425,6 +425,77 @@ def update_meal_plan_categories(
         db.close()
 
 
+@mcp.tool()
+def create_recipe(
+    ctx: Context, 
+    name: str,
+    source: Optional[str] = None,
+    rating: int = 0,
+    prep_time: Optional[str] = None,
+    cook_time: Optional[str] = None,
+    categories: List[str] = Field(default_factory=list, description="List of category names for the recipe"),
+    ingredients: List[mcp_models.IngredientCreateModel] = Field(default_factory=list, description="List of ingredients for the recipe"),
+    directions: List[mcp_models.DirectionCreateModel] = Field(default_factory=list, description="List of directions for the recipe")
+) -> mcp_models.RecipeModel:
+    """
+    Create a new recipe with ingredients, directions, and categories.
+    
+    Args:
+        ctx: MCP context
+        name: Name of the recipe
+        source: Source of the recipe (e.g., website, cookbook)
+        rating: Rating of the recipe (0-5)
+        prep_time: Preparation time (e.g., '10 minutes')
+        cook_time: Cooking time (e.g., '30 minutes')
+        categories: List of category names for the recipe
+        ingredients: List of ingredients with quantity, unit, name, and is_header flag
+        directions: List of directions with step_number and description
+        
+    Returns:
+        Created recipe
+    """
+    # Create a new database session
+    db = SessionLocal()
+    
+    try:
+        # Convert MCP models to schema models
+        schema_ingredients = [
+            schemas.IngredientCreate(
+                quantity=ingredient.quantity,
+                unit=ingredient.unit,
+                name=ingredient.name,
+                is_header=ingredient.is_header
+            ) for ingredient in ingredients
+        ]
+        
+        schema_directions = [
+            schemas.DirectionCreate(
+                step_number=direction.step_number,
+                description=direction.description
+            ) for direction in directions
+        ]
+        
+        # Create recipe schema from request
+        recipe_schema = schemas.RecipeCreate(
+            name=name,
+            source=source,
+            rating=rating,
+            prep_time=prep_time,
+            cook_time=cook_time,
+            categories=categories,
+            ingredients=schema_ingredients,
+            directions=schema_directions
+        )
+        
+        # Create the recipe
+        recipe = crud.create_recipe(db, recipe=recipe_schema)
+        
+        # Return the created recipe
+        return mcp_models.RecipeModel.model_validate(recipe)
+    finally:
+        db.close()
+
+
 if __name__ == "__main__":
     try:
         mcp.run(transport='stdio')

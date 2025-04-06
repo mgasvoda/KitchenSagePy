@@ -2,7 +2,8 @@
 
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func
+from fuzzywuzzy import process, fuzz
 import re
 
 from . import models, schemas
@@ -34,6 +35,54 @@ def get_or_create_category(db: Session, name: str) -> models.Category:
 def get_recipe(db: Session, recipe_id: int) -> Optional[models.Recipe]:
     """Get a recipe by ID."""
     return db.query(models.Recipe).filter(models.Recipe.id == recipe_id).first()
+
+
+def fuzzy_ingredient_search(db: Session, ingredient_query: str, min_score: int = 70) -> List[int]:
+    """
+    Perform a fuzzy search for ingredients and return recipe IDs that match.
+    
+    Args:
+        db: Database session
+        ingredient_query: The ingredient name to search for
+        min_score: Minimum similarity score (0-100) to consider a match
+        
+    Returns:
+        List of recipe IDs that have ingredients matching the query
+    """
+    # Get all ingredients from the database
+    all_ingredients = db.query(models.Ingredient).filter(models.Ingredient.is_header == 0).all()
+    
+    # No ingredients found
+    if not all_ingredients:
+        return []
+    
+    # Create a list of (ingredient_id, recipe_id, ingredient_name) tuples
+    ingredient_data = [(ing.id, ing.recipe_id, ing.name) for ing in all_ingredients]
+    
+    # Extract just the names for fuzzy matching
+    ingredient_names = [ing[2] for ing in ingredient_data]
+    
+    # Perform fuzzy matching
+    matches = process.extractBests(
+        ingredient_query, 
+        ingredient_names, 
+        scorer=fuzz.partial_ratio,  # Use partial ratio for better matching of substrings
+        score_cutoff=min_score,
+        limit=50  # Limit to top 50 matches to avoid performance issues
+    )
+    
+    # If no matches found
+    if not matches:
+        return []
+    
+    # Get the indices of the matched ingredients
+    matched_indices = [ingredient_names.index(match[0]) for match in matches]
+    
+    # Get the recipe IDs for the matched ingredients
+    recipe_ids = [ingredient_data[idx][1] for idx in matched_indices]
+    
+    # Return unique recipe IDs
+    return list(set(recipe_ids))
 
 
 def get_recipes(
@@ -80,10 +129,26 @@ def get_recipes(
     
     # Apply ingredient filter if provided
     if ingredient:
-        ingredient_term = f"%{ingredient}%"
-        query = query.join(models.Recipe.ingredients).filter(
-            models.Ingredient.name.ilike(ingredient_term)
-        )
+        # Check if we should use fuzzy search (ingredient contains at least 3 characters)
+        if len(ingredient.strip()) >= 3:
+            # Get recipe IDs that match the ingredient using fuzzy search
+            matching_recipe_ids = fuzzy_ingredient_search(db, ingredient)
+            
+            if matching_recipe_ids:
+                # Filter recipes by the matched IDs
+                query = query.filter(models.Recipe.id.in_(matching_recipe_ids))
+            else:
+                # Fallback to regular search if no fuzzy matches
+                ingredient_term = f"%{ingredient}%"
+                query = query.join(models.Recipe.ingredients).filter(
+                    models.Ingredient.name.ilike(ingredient_term)
+                )
+        else:
+            # Use regular search for short terms
+            ingredient_term = f"%{ingredient}%"
+            query = query.join(models.Recipe.ingredients).filter(
+                models.Ingredient.name.ilike(ingredient_term)
+            )
     
     # Apply total time filter if provided
     if max_total_time is not None:
@@ -148,10 +213,26 @@ def count_recipes(
     
     # Apply ingredient filter if provided
     if ingredient:
-        ingredient_term = f"%{ingredient}%"
-        query = query.join(models.Recipe.ingredients).filter(
-            models.Ingredient.name.ilike(ingredient_term)
-        )
+        # Check if we should use fuzzy search (ingredient contains at least 3 characters)
+        if len(ingredient.strip()) >= 3:
+            # Get recipe IDs that match the ingredient using fuzzy search
+            matching_recipe_ids = fuzzy_ingredient_search(db, ingredient)
+            
+            if matching_recipe_ids:
+                # Filter recipes by the matched IDs
+                query = query.filter(models.Recipe.id.in_(matching_recipe_ids))
+            else:
+                # Fallback to regular search if no fuzzy matches
+                ingredient_term = f"%{ingredient}%"
+                query = query.join(models.Recipe.ingredients).filter(
+                    models.Ingredient.name.ilike(ingredient_term)
+                )
+        else:
+            # Use regular search for short terms
+            ingredient_term = f"%{ingredient}%"
+            query = query.join(models.Recipe.ingredients).filter(
+                models.Ingredient.name.ilike(ingredient_term)
+            )
     
     # Apply total time filter if provided
     if max_total_time is not None:

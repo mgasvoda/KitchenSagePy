@@ -7,9 +7,11 @@ requires-python = ">=3.13"
 dependencies = [
     "beautifulsoup4>=4.12.2",
     "fastapi>=0.104.0",
+    "fuzzywuzzy>=0.18.0",
     "jinja2>=3.1.2",
     "mcp[cli]>=1.6.0",
     "pydantic>=2.4.2",
+    "python-levenshtein>=0.27.1",
     "python-multipart>=0.0.6",
     "sqlalchemy>=2.0.0",
     "uvicorn>=0.23.2",

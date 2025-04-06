@@ -35,3 +35,6 @@ mcp:
         kitchen_sage:
             command: "C:\\Users\\mgasv\\AppData\\Roaming\\Python\\Python313\\Scripts\\uv.exe"
             args: ["--directory", "E:\\pyfiles\\KitchenSagePy\\app\\mcp", "run", "server.py"]
+        fetch:
+            command: "C:\\Users\\mgasv\\AppData\\Roaming\\Python\\Python313\\Scripts\\uvx.exe"
+            args: ["mcp-server-fetch"]

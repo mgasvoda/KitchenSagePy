@@ -127,3 +127,29 @@ class RecipeCategoryUpdateRequest(BaseModel):
 class MealPlanCategoryUpdateRequest(BaseModel):
     """Request model for updating meal plan categories."""
     categories: List[str] = Field([], description="List of category names to assign to the meal plan")
+
+
+class IngredientCreateModel(BaseModel):
+    """Request model for ingredient creation."""
+    quantity: Optional[str] = None
+    unit: Optional[str] = None
+    name: str
+    is_header: int = 0
+
+
+class DirectionCreateModel(BaseModel):
+    """Request model for direction creation."""
+    step_number: int
+    description: str
+
+
+class RecipeCreateRequest(BaseModel):
+    """Request model for recipe creation."""
+    name: str
+    source: Optional[str] = Field(None, description="Source of the recipe")
+    rating: int = Field(0, description="Rating of the recipe (0-5)")
+    prep_time: Optional[str] = Field(None, description="Preparation time (e.g., '10 minutes')")
+    cook_time: Optional[str] = Field(None, description="Cooking time (e.g., '30 minutes')")
+    categories: List[str] = Field([], description="List of category names for the recipe")
+    ingredients: List[IngredientCreateModel] = Field([], description="List of ingredients for the recipe")
+    directions: List[DirectionCreateModel] = Field([], description="List of directions for the recipe")
