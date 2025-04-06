@@ -79,13 +79,10 @@ class MealPlanCreateRequest(BaseModel):
 
 class MealPlanUpdateRequest(BaseModel):
     """Request model for updating a meal plan."""
-    name: str
-    recipe_ids: List[int] = Field([], description="List of recipe IDs to include in the meal plan")
-
-
-class MealPlanCategoryUpdateRequest(BaseModel):
-    """Request model for updating meal plan categories."""
-    categories: List[str] = Field([], description="List of category names to assign to the meal plan")
+    name: Optional[str] = Field(None, description="Name of the meal plan")
+    recipe_ids: Optional[List[int]] = Field(None, description="List of recipe IDs to include in the meal plan")
+    categories: Optional[List[str]] = Field(None, description="List of category names to assign to the meal plan")
+    update_categories_only: bool = Field(False, description="If true, only update the categories")
 
 
 class IngredientCreateModel(BaseModel):

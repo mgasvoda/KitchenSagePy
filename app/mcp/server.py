@@ -64,139 +64,98 @@ def get_categories(ctx: Context) -> List[mcp_models.CategoryModel]:
 
 # Meal Plan tools
 @mcp.tool()
-def create_meal_plan(
-    ctx: Context, 
-    name: str,
-    recipe_ids: List[int] = Field(default_factory=list, description="List of recipe IDs to include in the meal plan")
-) -> mcp_models.MealPlanModel:
-    """
-    Create a new meal plan.
-    
-    Args:
-        ctx: MCP context
-        name: Name of the meal plan
-        recipe_ids: List of recipe IDs to include in the meal plan
-        
-    Returns:
-        Created meal plan
-    """
-    # Create a new database session
-    db = SessionLocal()
-    
-    try:
-        # Create meal plan schema from request
-        meal_plan_schema = schemas.MealPlanCreate(
-            name=name,
-            recipe_ids=recipe_ids
-        )
-        
-        # Create the meal plan
-        meal_plan = crud.create_meal_plan(db, meal_plan=meal_plan_schema)
-        
-        # Return the created meal plan
-        return mcp_models.MealPlanModel.model_validate(meal_plan)
-    finally:
-        db.close()
-
-
-@mcp.tool()
 def update_meal_plan(
     ctx: Context, 
-    meal_plan_id: int, 
-    name: str,
-    recipe_ids: List[int] = Field(default_factory=list, description="List of recipe IDs to include in the meal plan")
+    meal_plan_id: Optional[int] = None,
+    request: mcp_models.MealPlanUpdateRequest = None,
+    # Individual parameters for backward compatibility and convenience
+    name: Optional[str] = None,
+    recipe_ids: Optional[List[int]] = None,
+    categories: Optional[List[str]] = None,
+    update_categories_only: bool = False
 ) -> Optional[mcp_models.MealPlanModel]:
     """
-    Update an existing meal plan.
+    Create or update a meal plan with recipes and categories.
+    
+    This function combines the functionality of create_meal_plan and update_meal_plan_categories.
+    If meal_plan_id is provided, it updates an existing meal plan; otherwise, it creates a new one.
     
     Args:
         ctx: MCP context
-        meal_plan_id: ID of the meal plan to update
-        name: New name for the meal plan
-        recipe_ids: Updated list of recipe IDs to include in the meal plan
-        
-    Returns:
-        Updated meal plan or None if not found
-    """
-    # Create a new database session
-    db = SessionLocal()
-    
-    try:
-        # Create meal plan schema from request
-        meal_plan_schema = schemas.MealPlanCreate(
-            name=name,
-            recipe_ids=recipe_ids
-        )
-        
-        # Update the meal plan
-        meal_plan = crud.update_meal_plan(
-            db, 
-            meal_plan_id=meal_plan_id, 
-            meal_plan_data=meal_plan_schema
-        )
-        
-        if meal_plan is None:
-            return None
-        
-        # Return the updated meal plan
-        return mcp_models.MealPlanModel.model_validate(meal_plan)
-    finally:
-        db.close()
-
-
-@mcp.tool()
-def delete_meal_plan(ctx: Context, meal_plan_id: int) -> bool:
-    """
-    Delete a meal plan.
-    
-    Args:
-        ctx: MCP context
-        meal_plan_id: ID of the meal plan to delete
-        
-    Returns:
-        True if meal plan was deleted, False if not found
-    """
-    # Create a new database session
-    db = SessionLocal()
-    
-    try:
-        # Delete the meal plan
-        return crud.delete_meal_plan(db, meal_plan_id=meal_plan_id)
-    finally:
-        db.close()
-
-@mcp.tool()
-def update_meal_plan_categories(
-    ctx: Context, 
-    meal_plan_id: int,
-    categories: List[str] = Field(default_factory=list, description="List of category names to assign to the meal plan")
-) -> Optional[mcp_models.MealPlanModel]:
-    """
-    Update the categories of an existing meal plan.
-    
-    Args:
-        ctx: MCP context
-        meal_plan_id: ID of the meal plan to update
+        meal_plan_id: ID of the meal plan to update (None for create)
+        request: Meal plan update request object (alternative to individual parameters)
+        name: Name of the meal plan
+        recipe_ids: List of recipe IDs to include in the meal plan
         categories: List of category names to assign to the meal plan
+        update_categories_only: If true, only update the categories
         
     Returns:
-        Updated meal plan or None if not found
+        Created or updated meal plan, or None if update fails
     """
     # Create a new database session
     db = SessionLocal()
     
     try:
-        # Update the meal plan categories
-        meal_plan = crud.update_meal_plan_categories(
-            db, 
-            meal_plan_id=meal_plan_id, 
-            categories=categories
+        # Use request object if provided, otherwise use individual parameters
+        if request is not None:
+            name = request.name if name is None else name
+            recipe_ids = request.recipe_ids if recipe_ids is None else recipe_ids
+            categories = request.categories if categories is None else categories
+            update_categories_only = request.update_categories_only if update_categories_only is False else update_categories_only
+        
+        # Handle categories-only update
+        if meal_plan_id is not None and update_categories_only:
+            if categories is None:
+                categories = []
+            meal_plan = crud.update_meal_plan_categories(
+                db, 
+                meal_plan_id=meal_plan_id, 
+                categories=categories
+            )
+            
+            if meal_plan is None:
+                return None
+            
+            # Return the updated meal plan
+            return mcp_models.MealPlanModel.model_validate(meal_plan)
+        
+        # For full update or create, we need all the required fields
+        if meal_plan_id is None and name is None:
+            raise ValueError("Name is required when creating a new meal plan")
+        
+        # Create meal plan schema
+        meal_plan_schema = schemas.MealPlanCreate(
+            name=name if name is not None else "",
+            recipe_ids=recipe_ids if recipe_ids is not None else []
         )
         
-        if meal_plan is None:
-            return None
+        # Create or update the meal plan
+        if meal_plan_id is None:
+            # Create new meal plan
+            meal_plan = crud.create_meal_plan(db, meal_plan=meal_plan_schema)
+        else:
+            # Update existing meal plan
+            meal_plan = crud.update_meal_plan(
+                db, 
+                meal_plan_id=meal_plan_id, 
+                meal_plan_data=meal_plan_schema
+            )
+            
+            if meal_plan is None:
+                return None
+            
+            # Update categories if provided
+            if categories is not None:
+                meal_plan = crud.update_meal_plan_categories(
+                    db, 
+                    meal_plan_id=meal_plan_id, 
+                    categories=categories
+                )
+                
+                if meal_plan is None:
+                    return None
         
-        # Return the updated meal plan
+        # Return the created/updated meal plan
         return mcp_models.MealPlanModel.model_validate(meal_plan)
     finally:
         db.close()
