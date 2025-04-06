@@ -38,102 +38,6 @@ def debug_print_exception(e: Exception):
     traceback.print_exc(file=sys.stderr)
 
 
-
-@mcp.tool()
-def search_recipes(
-    ctx: Context, 
-    name: Optional[str] = None,
-    ingredient: Optional[str] = None,
-    category: Optional[str] = None,
-    max_total_time: Optional[int] = None,
-    skip: int = 0,
-    limit: int = 10
-) -> mcp_models.RecipeSearchResponse:
-    """
-    Search for recipes with optional filtering by name, ingredient, and total time.
-    
-    Args:
-        ctx: MCP context
-        name: Search term for recipe name or source
-        ingredient: Ingredient to search for
-        category: Category to filter by
-        max_total_time: Maximum total time (prep + cook) in minutes
-        skip: Number of recipes to skip (for pagination)
-        limit: Maximum number of recipes to return
-        
-    Returns:
-        List of recipes matching the criteria and total count
-    """
-    # Create a new database session
-    db = SessionLocal()
-    
-    try:
-        # Call the existing CRUD function to search for recipes
-        recipes = crud.get_recipes(
-            db=db,
-            skip=skip,
-            limit=limit,
-            search=name,
-            category=category,
-            ingredient=ingredient,
-            max_total_time=max_total_time
-        )
-        
-        # Get the total count
-        total = crud.count_recipes(
-            db=db,
-            search=name,
-            category=category,
-            ingredient=ingredient,
-            max_total_time=max_total_time
-        )
-        
-        # Convert to simplified recipe models
-        simple_recipes = [
-            mcp_models.SimpleRecipeModel(
-                id=recipe.id,
-                name=recipe.name,
-                rating=recipe.rating,
-                prep_time=recipe.prep_time,
-                cook_time=recipe.cook_time,
-                ingredients=recipe.ingredients,
-                categories=recipe.categories
-            ) for recipe in recipes
-        ]
-        
-        # Return the response
-        return mcp_models.RecipeSearchResponse(recipes=simple_recipes, total=total)
-    finally:
-        db.close()
-
-
-@mcp.tool()
-def get_recipe_by_id(ctx: Context, recipe_id: int) -> Optional[mcp_models.RecipeModel]:
-    """
-    Get a specific recipe by ID.
-    
-    Args:
-        ctx: MCP context
-        recipe_id: ID of the recipe to retrieve
-        
-    Returns:
-        Recipe details or None if not found
-    """
-    # Create a new database session
-    db = SessionLocal()
-    
-    try:
-        # Call the existing CRUD function to get the recipe
-        recipe = crud.get_recipe(db, recipe_id=recipe_id)
-        
-        if recipe is None:
-            return None
-        
-        return mcp_models.RecipeModel.model_validate(recipe)
-    finally:
-        db.close()
-
-
 @mcp.tool()
 def get_categories(ctx: Context) -> List[mcp_models.CategoryModel]:
     """
@@ -191,67 +95,6 @@ def create_meal_plan(
         
         # Return the created meal plan
         return mcp_models.MealPlanModel.model_validate(meal_plan)
-    finally:
-        db.close()
-
-
-@mcp.tool()
-def get_meal_plan(ctx: Context, meal_plan_id: int) -> Optional[mcp_models.MealPlanModel]:
-    """
-    Get a specific meal plan by ID.
-    
-    Args:
-        ctx: MCP context
-        meal_plan_id: ID of the meal plan to retrieve
-        
-    Returns:
-        Meal plan details or None if not found
-    """
-    # Create a new database session
-    db = SessionLocal()
-    
-    try:
-        # Get the meal plan
-        meal_plan = crud.get_meal_plan(db, meal_plan_id=meal_plan_id)
-        
-        if meal_plan is None:
-            return None
-        
-        # Return the meal plan
-        return mcp_models.MealPlanModel.model_validate(meal_plan)
-    finally:
-        db.close()
-
-
-@mcp.tool()
-def list_meal_plans(
-    ctx: Context, 
-    skip: int = 0, 
-    limit: int = 100, 
-    search: Optional[str] = None
-) -> mcp_models.MealPlanListResponse:
-    """
-    List meal plans with optional filtering.
-    
-    Args:
-        ctx: MCP context
-        skip: Number of meal plans to skip (for pagination)
-        limit: Maximum number of meal plans to return
-        search: Optional search term to filter meal plans by name
-        
-    Returns:
-        List of meal plans matching the criteria and total count
-    """
-    # Create a new database session
-    db = SessionLocal()
-    
-    try:
-        # Get meal plans
-        meal_plans = crud.get_meal_plans(db, skip=skip, limit=limit, search=search)
-        total = crud.count_meal_plans(db, search=search)
-        
-        # Return the response
-        return mcp_models.MealPlanListResponse(meal_plans=meal_plans, total=total)
     finally:
         db.close()
 
@@ -321,35 +164,6 @@ def delete_meal_plan(ctx: Context, meal_plan_id: int) -> bool:
         return crud.delete_meal_plan(db, meal_plan_id=meal_plan_id)
     finally:
         db.close()
-
-
-@mcp.tool()
-def get_meal_plan_ingredients(ctx: Context, meal_plan_id: int) -> Optional[List[mcp_models.MealPlanIngredientModel]]:
-    """
-    Get consolidated ingredients for a meal plan.
-    
-    Args:
-        ctx: MCP context
-        meal_plan_id: ID of the meal plan
-        
-    Returns:
-        List of consolidated ingredients or None if meal plan not found
-    """
-    # Create a new database session
-    db = SessionLocal()
-    
-    try:
-        # Get the meal plan
-        meal_plan = crud.get_meal_plan(db, meal_plan_id=meal_plan_id)
-        
-        if meal_plan is None:
-            return None
-        
-        # Return the consolidated ingredients
-        return meal_plan.all_ingredients
-    finally:
-        db.close()
-
 
 @mcp.tool()
 def update_recipe_categories(
@@ -492,6 +306,179 @@ def create_recipe(
         
         # Return the created recipe
         return mcp_models.RecipeModel.model_validate(recipe)
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def get_recipes(
+    ctx: Context,
+    request: mcp_models.RecipeGetRequest
+) -> mcp_models.RecipeGetResponse:
+    """
+    Get recipes with flexible filtering and column selection.
+    
+    This function combines search functionality with the ability to select
+    which columns are returned in the response. It can be used to:
+    1. Get a specific recipe by ID
+    2. Search recipes by name, ingredient, category, or time
+    3. Control which fields are returned in the response
+    
+    Args:
+        ctx: MCP context
+        request: Recipe get request with filtering options and column selection
+        
+    Returns:
+        List of recipes matching the criteria with selected columns and total count
+    """
+    # Create a new database session
+    db = SessionLocal()
+    
+    try:
+        if request.id is not None:
+            # Get a specific recipe by ID
+            recipe = crud.get_recipe(db, recipe_id=request.id)
+            recipes = [recipe] if recipe else []
+            total = 1 if recipe else 0
+        else:
+            # Search for recipes with filters
+            recipes = crud.get_recipes(
+                db=db,
+                skip=request.skip,
+                limit=request.limit,
+                search=request.name,
+                category=request.category,
+                ingredient=request.ingredient,
+                max_total_time=request.max_total_time
+            )
+            
+            # Get the total count
+            total = crud.count_recipes(
+                db=db,
+                search=request.name,
+                category=request.category,
+                ingredient=request.ingredient,
+                max_total_time=request.max_total_time
+            )
+        
+        # Create dynamic models with only the requested columns
+        dynamic_recipes = []
+        for recipe in recipes:
+            recipe_dict = {}
+            
+            # Add basic fields if requested
+            for field in request.columns:
+                if field in ["id", "name", "source", "rating", "prep_time", "cook_time", "description", "notes"]:
+                    recipe_dict[field] = getattr(recipe, field, None)
+            
+            # Add related fields if requested
+            if "ingredients" in request.columns:
+                recipe_dict["ingredients"] = [
+                    mcp_models.IngredientModel.model_validate(ingredient)
+                    for ingredient in recipe.ingredients
+                ]
+            
+            if "directions" in request.columns:
+                recipe_dict["directions"] = [
+                    mcp_models.DirectionModel.model_validate(direction)
+                    for direction in recipe.directions
+                ]
+            
+            if "categories" in request.columns:
+                recipe_dict["categories"] = [
+                    mcp_models.CategoryModel.model_validate(category)
+                    for category in recipe.categories
+                ]
+            
+            dynamic_recipes.append(mcp_models.DynamicRecipeModel(**recipe_dict))
+        
+        # Return the response
+        return mcp_models.RecipeGetResponse(recipes=dynamic_recipes, total=total)
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def get_meal_plans(
+    ctx: Context,
+    request: mcp_models.MealPlanGetRequest
+) -> mcp_models.MealPlanGetResponse:
+    """
+    Get meal plans with flexible filtering and column selection.
+    
+    This function combines search functionality with the ability to select
+    which columns are returned in the response. It can be used to:
+    1. Get a specific meal plan by ID
+    2. Search meal plans by name
+    3. Control which fields are returned in the response
+    4. Optionally include related recipes and consolidated ingredients
+    
+    Args:
+        ctx: MCP context
+        request: Meal plan get request with filtering options and column selection
+        
+    Returns:
+        List of meal plans matching the criteria with selected columns and total count
+    """
+    # Create a new database session
+    db = SessionLocal()
+    
+    try:
+        if request.id is not None:
+            # Get a specific meal plan by ID
+            meal_plan = crud.get_meal_plan(db, meal_plan_id=request.id)
+            meal_plans = [meal_plan] if meal_plan else []
+            total = 1 if meal_plan else 0
+        else:
+            # Search for meal plans with filters
+            meal_plans = crud.get_meal_plans(
+                db=db,
+                skip=request.skip,
+                limit=request.limit,
+                search=request.name
+            )
+            
+            # Get the total count
+            total = crud.count_meal_plans(
+                db=db,
+                search=request.name
+            )
+        
+        # Create dynamic models with only the requested columns
+        dynamic_meal_plans = []
+        for meal_plan in meal_plans:
+            meal_plan_dict = {}
+            
+            # Add basic fields if requested
+            for field in request.columns:
+                if field in ["id", "name", "created_at"]:
+                    meal_plan_dict[field] = getattr(meal_plan, field, None)
+            
+            # Add categories if requested
+            if "categories" in request.columns:
+                meal_plan_dict["categories"] = [
+                    mcp_models.CategoryModel.model_validate(category)
+                    for category in meal_plan.categories
+                ]
+            
+            # Add recipes if requested
+            if request.include_recipes:
+                meal_plan_dict["recipes"] = [
+                    mcp_models.RecipeModel.model_validate(recipe)
+                    for recipe in meal_plan.recipes
+                ]
+            
+            # Add consolidated ingredients if requested
+            if request.include_ingredients:
+                meal_plan_dict["all_ingredients"] = [
+                    mcp_models.MealPlanIngredientModel(**ingredient)
+                    for ingredient in meal_plan.all_ingredients
+                ]
+            
+            dynamic_meal_plans.append(mcp_models.DynamicMealPlanModel(**meal_plan_dict))
+        
+        # Return the response
+        return mcp_models.MealPlanGetResponse(meal_plans=dynamic_meal_plans, total=total)
     finally:
         db.close()
 
