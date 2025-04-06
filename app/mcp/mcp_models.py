@@ -13,7 +13,10 @@ class IngredientModel(BaseModel):
     name: str
     is_header: int = 0
 
-    model_config = {"extra": "allow"}
+    model_config = {
+        "from_attributes": True,
+        "extra": "allow"
+    }
 
 
 class DirectionModel(BaseModel):
@@ -22,7 +25,10 @@ class DirectionModel(BaseModel):
     step_number: int
     description: str
 
-    model_config = {"extra": "allow"}
+    model_config = {
+        "from_attributes": True,
+        "extra": "allow"
+    }
 
 
 class CategoryModel(BaseModel):
@@ -30,7 +36,10 @@ class CategoryModel(BaseModel):
     id: int
     name: str
 
-    model_config = {"extra": "allow"}
+    model_config = {
+        "from_attributes": True,
+        "extra": "allow"
+    }
 
 
 class RecipeModel(BaseModel):
@@ -45,7 +54,10 @@ class RecipeModel(BaseModel):
     directions: List[DirectionModel] = []
     categories: List[CategoryModel] = []
 
-    model_config = {"extra": "allow"}
+    model_config = {
+        "from_attributes": True,
+        "extra": "allow"
+    }
 
 
 class MealPlanIngredientModel(BaseModel):
@@ -54,7 +66,10 @@ class MealPlanIngredientModel(BaseModel):
     quantity: Optional[str] = None
     unit: Optional[str] = None
 
-    model_config = {"extra": "allow"}
+    model_config = {
+        "from_attributes": True,
+        "extra": "allow"
+    }
 
 
 class MealPlanModel(BaseModel):
@@ -65,7 +80,10 @@ class MealPlanModel(BaseModel):
     recipes: List[RecipeModel] = []
     all_ingredients: List[MealPlanIngredientModel] = []
 
-    model_config = {"extra": "allow"}
+    model_config = {
+        "from_attributes": True,
+        "extra": "allow"
+    }
 
 
 class MealPlanCreateRequest(BaseModel):
@@ -450,12 +468,18 @@ class MealPlanGetRequest(BaseModel):
 
 class DynamicRecipeModel(BaseModel):
     """Dynamic response model for recipe with flexible fields."""
-    model_config = {"extra": "allow"}
+    model_config = {
+        "from_attributes": True,
+        "extra": "allow"
+    }
 
 
 class DynamicMealPlanModel(BaseModel):
     """Dynamic response model for meal plan with flexible fields."""
-    model_config = {"extra": "allow"}
+    model_config = {
+        "from_attributes": True,
+        "extra": "allow"
+    }
 
 
 class RecipeGetResponse(BaseModel):
@@ -471,6 +495,11 @@ class RecipeGetResponse(BaseModel):
         description="Total number of recipes matching the search criteria (before pagination)."
     )
 
+    model_config = {
+        "from_attributes": True,
+        "extra": "allow"
+    }
+
 
 class MealPlanGetResponse(BaseModel):
     """
@@ -484,3 +513,8 @@ class MealPlanGetResponse(BaseModel):
     total: int = Field(
         description="Total number of meal plans matching the search criteria (before pagination)."
     )
+
+    model_config = {
+        "from_attributes": True,
+        "extra": "allow"
+    }

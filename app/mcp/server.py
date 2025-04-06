@@ -57,7 +57,7 @@ def get_categories(ctx: Context) -> List[mcp_models.CategoryModel]:
         categories = db.query(models.Category).order_by(models.Category.name).all()
         
         # Convert to response model
-        return [mcp_models.CategoryModel.model_validate(category) for category in categories]
+        return [mcp_models.CategoryModel.model_validate(category, from_attributes=True) for category in categories]
     finally:
         db.close()
 
@@ -112,7 +112,7 @@ def update_meal_plan(
                 return None
             
             # Return the updated meal plan
-            return mcp_models.MealPlanModel.model_validate(meal_plan)
+            return mcp_models.MealPlanModel.model_validate(meal_plan, from_attributes=True)
         
         # For full update or create, we need all the required fields
         if meal_plan_id is None and name is None:
@@ -151,7 +151,7 @@ def update_meal_plan(
                     return None
         
         # Return the created/updated meal plan
-        return mcp_models.MealPlanModel.model_validate(meal_plan)
+        return mcp_models.MealPlanModel.model_validate(meal_plan, from_attributes=True)
     finally:
         db.close()
 
@@ -210,7 +210,7 @@ def update_recipe(
                 return None
             
             # Return the updated recipe
-            return mcp_models.RecipeModel.model_validate(recipe)
+            return mcp_models.RecipeModel.model_validate(recipe, from_attributes=True)
         
         # For full update or create, we need all the required fields
         if recipe_id is None and name is None:
@@ -261,7 +261,7 @@ def update_recipe(
                 return None
         
         # Return the created/updated recipe
-        return mcp_models.RecipeModel.model_validate(recipe)
+        return mcp_models.RecipeModel.model_validate(recipe, from_attributes=True)
     finally:
         db.close()
 
@@ -337,19 +337,19 @@ def get_recipes(
             # Add related fields if requested
             if "ingredients" in request.columns and hasattr(recipe, "ingredients"):
                 recipe_dict["ingredients"] = [
-                    mcp_models.IngredientModel.model_validate(ingredient)
+                    mcp_models.IngredientModel.model_validate(ingredient, from_attributes=True)
                     for ingredient in recipe.ingredients
                 ]
             
             if "directions" in request.columns and hasattr(recipe, "directions"):
                 recipe_dict["directions"] = [
-                    mcp_models.DirectionModel.model_validate(direction)
+                    mcp_models.DirectionModel.model_validate(direction, from_attributes=True)
                     for direction in recipe.directions
                 ]
             
             if "categories" in request.columns and hasattr(recipe, "categories"):
                 recipe_dict["categories"] = [
-                    mcp_models.CategoryModel.model_validate(category)
+                    mcp_models.CategoryModel.model_validate(category, from_attributes=True)
                     for category in recipe.categories
                 ]
             
@@ -425,7 +425,7 @@ def get_meal_plans(
             # Add categories if requested
             if "categories" in request.columns and hasattr(meal_plan, "categories"):
                 meal_plan_dict["categories"] = [
-                    mcp_models.CategoryModel.model_validate(category)
+                    mcp_models.CategoryModel.model_validate(category, from_attributes=True)
                     for category in meal_plan.categories
                 ]
             
@@ -445,25 +445,25 @@ def get_meal_plans(
                     # Include ingredients if requested
                     if request.include_ingredients and hasattr(recipe, "ingredients"):
                         recipe_dict["ingredients"] = [
-                            mcp_models.IngredientModel.model_validate(ingredient)
+                            mcp_models.IngredientModel.model_validate(ingredient, from_attributes=True)
                             for ingredient in recipe.ingredients
                         ]
                     
                     # Include categories if requested
                     if hasattr(recipe, "categories"):
                         recipe_dict["categories"] = [
-                            mcp_models.CategoryModel.model_validate(category)
+                            mcp_models.CategoryModel.model_validate(category, from_attributes=True)
                             for category in recipe.categories
                         ]
                     
-                    recipe_list.append(mcp_models.RecipeModel.model_validate(recipe_dict))
+                    recipe_list.append(mcp_models.RecipeModel.model_validate(recipe_dict, from_attributes=True))
                 
                 meal_plan_dict["recipes"] = recipe_list
             
             # Add consolidated ingredients if requested
             if "all_ingredients" in request.columns and request.include_ingredients and hasattr(meal_plan, "all_ingredients"):
                 meal_plan_dict["all_ingredients"] = [
-                    mcp_models.MealPlanIngredientModel(**ingredient)
+                    mcp_models.MealPlanIngredientModel.model_validate(ingredient, from_attributes=True)
                     for ingredient in meal_plan.all_ingredients
                 ]
             
