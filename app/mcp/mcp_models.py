@@ -1,4 +1,10 @@
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from datetime import datetime
+
 # Define request and response models
+
+
 class RecipeSearchRequest(BaseModel):
     """Request model for recipe search."""
     name: Optional[str] = Field(None, description="Search term for recipe name")
@@ -63,6 +69,8 @@ class SimpleRecipeModel(BaseModel):
     rating: int = 0
     prep_time: Optional[str] = None
     cook_time: Optional[str] = None
+    ingredients: List[IngredientModel] = []
+    categories: List[CategoryModel] = []
 
     class Config:
         from_attributes = True
