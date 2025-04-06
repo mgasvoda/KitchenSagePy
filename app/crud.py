@@ -337,6 +337,45 @@ def update_recipe(
     return db_recipe
 
 
+def update_recipe_categories(
+    db: Session, 
+    recipe_id: int, 
+    categories: List[str]
+) -> Optional[models.Recipe]:
+    """
+    Update the categories of an existing recipe.
+    
+    Args:
+        db: Database session
+        recipe_id: ID of the recipe to update
+        categories: List of category names to assign to the recipe
+        
+    Returns:
+        Updated recipe or None if recipe not found
+    """
+    # Get the recipe
+    db_recipe = get_recipe(db, recipe_id)
+    if db_recipe is None:
+        return None
+    
+    # Get existing categories
+    existing = db_recipe.categories
+
+    # Add new categories
+    for category_name in categories:
+        if category_name in existing:
+            continue
+        # Get or create the category
+        category = get_or_create_category(db, category_name)
+        db_recipe.categories.append(category)
+    
+    # Commit changes
+    db.commit()
+    db.refresh(db_recipe)
+    
+    return db_recipe
+
+
 def delete_recipe(db: Session, recipe_id: int) -> bool:
     """
     Delete a recipe.
@@ -538,6 +577,45 @@ def update_meal_plan(
             db_meal_plan.recipes.append(recipe)
     
     # Commit all changes
+    db.commit()
+    db.refresh(db_meal_plan)
+    
+    return db_meal_plan
+
+
+def update_meal_plan_categories(
+    db: Session, 
+    meal_plan_id: int, 
+    categories: List[str]
+) -> Optional[models.MealPlan]:
+    """
+    Update the categories of an existing meal plan.
+    
+    Args:
+        db: Database session
+        meal_plan_id: ID of the meal plan to update
+        categories: List of category names to assign to the meal plan
+        
+    Returns:
+        Updated meal plan or None if meal plan not found
+    """
+    # Get the meal plan
+    db_meal_plan = get_meal_plan(db, meal_plan_id)
+    if db_meal_plan is None:
+        return None
+    
+    # Get existing categories
+    existing_categories = [category.name for category in db_meal_plan.categories]
+    
+    # Add new categories
+    for category_name in categories:
+        if category_name in existing_categories:
+            continue
+        # Get or create the category
+        category = get_or_create_category(db, category_name)
+        db_meal_plan.categories.append(category)
+    
+    # Commit changes
     db.commit()
     db.refresh(db_meal_plan)
     

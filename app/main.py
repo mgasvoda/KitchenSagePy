@@ -24,6 +24,7 @@ templates = Jinja2Templates(directory="app/templates")
 # Include API routes
 app.include_router(recipes.router)
 app.include_router(meal_plans.router)
+app.include_router(meal_plans.api_router)
 
 # Initialize database
 init_db()

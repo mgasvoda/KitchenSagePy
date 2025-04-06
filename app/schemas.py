@@ -92,6 +92,7 @@ class MealPlanBase(BaseModel):
 class MealPlanCreate(MealPlanBase):
     """Model for creating a meal plan."""
     recipe_ids: List[int] = []
+    categories: List[str] = []
 
 
 class MealPlanIngredient(BaseModel):
@@ -106,6 +107,7 @@ class MealPlan(MealPlanBase):
     id: int
     created_at: datetime.datetime
     recipes: List[Recipe] = []
+    categories: List[Category] = []
     all_ingredients: List[MealPlanIngredient] = []
 
     class Config:

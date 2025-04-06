@@ -24,6 +24,14 @@ meal_plan_recipe = Table(
     Column("recipe_id", Integer, ForeignKey("recipes.id"), primary_key=True)
 )
 
+# Association table for many-to-many relationship between meal plans and categories
+meal_plan_category = Table(
+    "meal_plan_category",
+    Base.metadata,
+    Column("meal_plan_id", Integer, ForeignKey("meal_plans.id"), primary_key=True),
+    Column("category_id", Integer, ForeignKey("categories.id"), primary_key=True)
+)
+
 
 class Recipe(Base):
     """Recipe model representing a cooking recipe."""
@@ -80,6 +88,7 @@ class Category(Base):
     
     # Relationships
     recipes = relationship("Recipe", secondary=recipe_category, back_populates="categories")
+    meal_plans = relationship("MealPlan", secondary=meal_plan_category, back_populates="categories")
 
 
 class MealPlan(Base):
@@ -92,6 +101,7 @@ class MealPlan(Base):
     
     # Relationships
     recipes = relationship("Recipe", secondary=meal_plan_recipe, back_populates="meal_plans")
+    categories = relationship("Category", secondary=meal_plan_category, back_populates="meal_plans")
     
     @property
     def all_ingredients(self) -> List[dict]:

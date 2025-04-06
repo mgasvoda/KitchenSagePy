@@ -25,6 +25,7 @@ try:
     # Try relative imports first (when imported as a module)
     from .. import models, crud, schemas
     from ..database import SessionLocal, engine
+    import mcp_models
 except ImportError:
     # Fall back to absolute imports (when run directly)
     # Add the project root to sys.path
@@ -33,6 +34,7 @@ except ImportError:
         sys.path.insert(0, project_root)
     from app import models, crud, schemas
     from app.database import SessionLocal, engine
+    from app.mcp import mcp_models
 
 
 # Create a named server
@@ -42,118 +44,6 @@ def debug_print_exception(e: Exception):
     print("Exception during startup:", file=sys.stderr)
     traceback.print_exc(file=sys.stderr)
 
-
-# Define request and response models
-class RecipeSearchRequest(BaseModel):
-    """Request model for recipe search."""
-    name: Optional[str] = Field(None, description="Search term for recipe name")
-    ingredient: Optional[str] = Field(None, description="Ingredient to search for")
-    category: Optional[str] = Field(None, description="Category to filter by")
-    max_total_time: Optional[int] = Field(None, description="Maximum total time (prep + cook) in minutes")
-    skip: int = Field(0, description="Number of recipes to skip (for pagination)")
-    limit: int = Field(100, description="Maximum number of recipes to return")
-
-
-class IngredientModel(BaseModel):
-    """Response model for ingredient."""
-    id: int
-    quantity: Optional[str] = None
-    unit: Optional[str] = None
-    name: str
-    is_header: int = 0
-
-    class Config:
-        from_attributes = True
-
-
-class DirectionModel(BaseModel):
-    """Response model for direction."""
-    id: int
-    step_number: int
-    description: str
-
-    class Config:
-        from_attributes = True
-
-
-class CategoryModel(BaseModel):
-    """Response model for category."""
-    id: int
-    name: str
-
-    class Config:
-        from_attributes = True
-
-
-class RecipeModel(BaseModel):
-    """Response model for recipe."""
-    id: int
-    name: str
-    source: Optional[str] = None
-    rating: int = 0
-    prep_time: Optional[str] = None
-    cook_time: Optional[str] = None
-    ingredients: List[IngredientModel] = []
-    directions: List[DirectionModel] = []
-    categories: List[CategoryModel] = []
-
-    class Config:
-        from_attributes = True
-
-
-class SimpleRecipeModel(BaseModel):
-    """Simplified response model for recipe with only essential fields."""
-    id: int
-    name: str
-    rating: int = 0
-    prep_time: Optional[str] = None
-    cook_time: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-
-
-class RecipeSearchResponse(BaseModel):
-    """Response model for recipe search."""
-    recipes: List[SimpleRecipeModel]
-    total: int
-
-
-class MealPlanIngredientModel(BaseModel):
-    """Model for consolidated ingredients in a meal plan."""
-    name: str
-    quantity: Optional[str] = None
-    unit: Optional[str] = None
-
-
-class MealPlanModel(BaseModel):
-    """Response model for meal plan."""
-    id: int
-    name: str
-    created_at: datetime
-    recipes: List[RecipeModel] = []
-    all_ingredients: List[MealPlanIngredientModel] = []
-
-    class Config:
-        from_attributes = True
-
-
-class MealPlanCreateRequest(BaseModel):
-    """Request model for creating a meal plan."""
-    name: str
-    recipe_ids: List[int] = Field([], description="List of recipe IDs to include in the meal plan")
-
-
-class MealPlanUpdateRequest(BaseModel):
-    """Request model for updating a meal plan."""
-    name: str
-    recipe_ids: List[int] = Field([], description="List of recipe IDs to include in the meal plan")
-
-
-class MealPlanListResponse(BaseModel):
-    """Response model for meal plan list."""
-    meal_plans: List[MealPlanModel]
-    total: int
 
 
 @mcp.tool()
@@ -165,7 +55,7 @@ def search_recipes(
     max_total_time: Optional[int] = None,
     skip: int = 0,
     limit: int = 10
-) -> RecipeSearchResponse:
+) -> mcp_models.RecipeSearchResponse:
     """
     Search for recipes with optional filtering by name, ingredient, and total time.
     
@@ -207,23 +97,25 @@ def search_recipes(
         
         # Convert to simplified recipe models
         simple_recipes = [
-            SimpleRecipeModel(
+            mcp_models.SimpleRecipeModel(
                 id=recipe.id,
                 name=recipe.name,
                 rating=recipe.rating,
                 prep_time=recipe.prep_time,
-                cook_time=recipe.cook_time
+                cook_time=recipe.cook_time,
+                ingredients=recipe.ingredients,
+                categories=recipe.categories
             ) for recipe in recipes
         ]
         
         # Return the response
-        return RecipeSearchResponse(recipes=simple_recipes, total=total)
+        return mcp_models.RecipeSearchResponse(recipes=simple_recipes, total=total)
     finally:
         db.close()
 
 
 @mcp.tool()
-def get_recipe_by_id(ctx: Context, recipe_id: int) -> Optional[RecipeModel]:
+def get_recipe_by_id(ctx: Context, recipe_id: int) -> Optional[mcp_models.RecipeModel]:
     """
     Get a specific recipe by ID.
     
@@ -244,15 +136,15 @@ def get_recipe_by_id(ctx: Context, recipe_id: int) -> Optional[RecipeModel]:
         if recipe is None:
             return None
         
-        return RecipeModel.model_validate(recipe)
+        return mcp_models.RecipeModel.model_validate(recipe)
     finally:
         db.close()
 
 
 @mcp.tool()
-def get_categories(ctx: Context) -> List[CategoryModel]:
+def get_categories(ctx: Context) -> List[mcp_models.CategoryModel]:
     """
-    Get all recipe categories.
+    Get all recipe categories. These may include meal types (i.e. dinner, snack, etc.), cuisines, seasons, or other groupings.
     
     Args:
         ctx: MCP context
@@ -268,7 +160,7 @@ def get_categories(ctx: Context) -> List[CategoryModel]:
         categories = db.query(models.Category).order_by(models.Category.name).all()
         
         # Convert to response model
-        return [CategoryModel.model_validate(category) for category in categories]
+        return [mcp_models.CategoryModel.model_validate(category) for category in categories]
     finally:
         db.close()
 
@@ -279,7 +171,7 @@ def create_meal_plan(
     ctx: Context, 
     name: str,
     recipe_ids: List[int] = Field(default_factory=list, description="List of recipe IDs to include in the meal plan")
-) -> MealPlanModel:
+) -> mcp_models.MealPlanModel:
     """
     Create a new meal plan.
     
@@ -305,13 +197,13 @@ def create_meal_plan(
         meal_plan = crud.create_meal_plan(db, meal_plan=meal_plan_schema)
         
         # Return the created meal plan
-        return MealPlanModel.model_validate(meal_plan)
+        return mcp_models.MealPlanModel.model_validate(meal_plan)
     finally:
         db.close()
 
 
 @mcp.tool()
-def get_meal_plan(ctx: Context, meal_plan_id: int) -> Optional[MealPlanModel]:
+def get_meal_plan(ctx: Context, meal_plan_id: int) -> Optional[mcp_models.MealPlanModel]:
     """
     Get a specific meal plan by ID.
     
@@ -333,7 +225,7 @@ def get_meal_plan(ctx: Context, meal_plan_id: int) -> Optional[MealPlanModel]:
             return None
         
         # Return the meal plan
-        return MealPlanModel.model_validate(meal_plan)
+        return mcp_models.MealPlanModel.model_validate(meal_plan)
     finally:
         db.close()
 
@@ -344,7 +236,7 @@ def list_meal_plans(
     skip: int = 0, 
     limit: int = 100, 
     search: Optional[str] = None
-) -> MealPlanListResponse:
+) -> mcp_models.MealPlanListResponse:
     """
     List meal plans with optional filtering.
     
@@ -366,7 +258,7 @@ def list_meal_plans(
         total = crud.count_meal_plans(db, search=search)
         
         # Return the response
-        return MealPlanListResponse(meal_plans=meal_plans, total=total)
+        return mcp_models.MealPlanListResponse(meal_plans=meal_plans, total=total)
     finally:
         db.close()
 
@@ -377,7 +269,7 @@ def update_meal_plan(
     meal_plan_id: int, 
     name: str,
     recipe_ids: List[int] = Field(default_factory=list, description="List of recipe IDs to include in the meal plan")
-) -> Optional[MealPlanModel]:
+) -> Optional[mcp_models.MealPlanModel]:
     """
     Update an existing meal plan.
     
@@ -411,7 +303,7 @@ def update_meal_plan(
             return None
         
         # Return the updated meal plan
-        return MealPlanModel.model_validate(meal_plan)
+        return mcp_models.MealPlanModel.model_validate(meal_plan)
     finally:
         db.close()
 
@@ -439,7 +331,7 @@ def delete_meal_plan(ctx: Context, meal_plan_id: int) -> bool:
 
 
 @mcp.tool()
-def get_meal_plan_ingredients(ctx: Context, meal_plan_id: int) -> Optional[List[MealPlanIngredientModel]]:
+def get_meal_plan_ingredients(ctx: Context, meal_plan_id: int) -> Optional[List[mcp_models.MealPlanIngredientModel]]:
     """
     Get consolidated ingredients for a meal plan.
     
@@ -462,6 +354,80 @@ def get_meal_plan_ingredients(ctx: Context, meal_plan_id: int) -> Optional[List[
         
         # Return the consolidated ingredients
         return meal_plan.all_ingredients
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def update_recipe_categories(
+    ctx: Context, 
+    recipe_id: int,
+    categories: List[str] = Field(default_factory=list, description="List of category names to assign to the recipe")
+) -> Optional[mcp_models.RecipeModel]:
+    """
+    Update the categories of an existing recipe.
+    
+    Args:
+        ctx: MCP context
+        recipe_id: ID of the recipe to update
+        categories: List of category names to assign to the recipe
+        
+    Returns:
+        Updated recipe or None if not found
+    """
+    # Create a new database session
+    db = SessionLocal()
+    
+    try:
+        # Update the recipe categories
+        recipe = crud.update_recipe_categories(
+            db, 
+            recipe_id=recipe_id, 
+            categories=categories
+        )
+        
+        if recipe is None:
+            return None
+        
+        # Return the updated recipe
+        return mcp_models.RecipeModel.model_validate(recipe)
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def update_meal_plan_categories(
+    ctx: Context, 
+    meal_plan_id: int,
+    categories: List[str] = Field(default_factory=list, description="List of category names to assign to the meal plan")
+) -> Optional[mcp_models.MealPlanModel]:
+    """
+    Update the categories of an existing meal plan.
+    
+    Args:
+        ctx: MCP context
+        meal_plan_id: ID of the meal plan to update
+        categories: List of category names to assign to the meal plan
+        
+    Returns:
+        Updated meal plan or None if not found
+    """
+    # Create a new database session
+    db = SessionLocal()
+    
+    try:
+        # Update the meal plan categories
+        meal_plan = crud.update_meal_plan_categories(
+            db, 
+            meal_plan_id=meal_plan_id, 
+            categories=categories
+        )
+        
+        if meal_plan is None:
+            return None
+        
+        # Return the updated meal plan
+        return mcp_models.MealPlanModel.model_validate(meal_plan)
     finally:
         db.close()
 

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ meal_plan.name }} - KitchenSage</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="main-header">
+            <div class="logo">
+                <a href="/">
+                    <h1>KitchenSage</h1>
+                </a>
+            </div>
+            <div class="search-container">
+                <form action="/search" method="get" class="search-form">
+                    <input type="text" name="query" placeholder="Search recipes..." class="search-input">
+                    <button type="submit" class="search-button">Search</button>
+                </form>
+            </div>
+        </header>
+
+        <div class="content">
+            <main class="meal-plan-detail">
+                <div class="meal-plan-header">
+                    <a href="/meal-plans" class="back-link">&laquo; Back to Meal Plans</a>
+                    <h1 class="meal-plan-title">{{ meal_plan.name }}</h1>
+                    
+                    {% if meal_plan.categories %}
+                        <div class="meal-plan-categories">
+                            {% for category in meal_plan.categories %}
+                                <a href="/meal-plans?category={{ category.name }}" class="category-tag">{{ category.name }}</a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    
+                    <p class="meal-plan-date">Created: {{ meal_plan.created_at.strftime('%B %d, %Y') }}</p>
+                </div>
+                
+                <div class="meal-plan-content">
+                    <div class="meal-plan-recipes-section">
+                        <h2>Recipes in this Meal Plan</h2>
+                        {% if meal_plan.recipes %}
+                            <div class="meal-plan-recipes">
+                                {% for recipe in meal_plan.recipes %}
+                                    <div class="meal-plan-recipe-item">
+                                        <a href="/recipe/{{ recipe.id }}" class="recipe-link">
+                                            <h3 class="recipe-title">{{ recipe.name }}</h3>
+                                            
+                                            {% if recipe.rating > 0 %}
+                                                <div class="recipe-rating">
+                                                    {% for i in range(recipe.rating) %}
+                                                        <span class="star">★</span>
+                                                    {% endfor %}
+                                                    {% for i in range(5 - recipe.rating) %}
+                                                        <span class="star empty">☆</span>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                            
+                                            {% if recipe.prep_time or recipe.cook_time %}
+                                                <div class="recipe-times">
+                                                    {% if recipe.prep_time %}
+                                                        <span class="recipe-prep-time">Prep: {{ recipe.prep_time }}</span>
+                                                    {% endif %}
+                                                    {% if recipe.cook_time %}
+                                                        <span class="recipe-cook-time">Cook: {{ recipe.cook_time }}</span>
+                                                    {% endif %}
+                                                </div>
+                                            {% endif %}
+                                            
+                                            {% if recipe.categories %}
+                                                <div class="recipe-categories">
+                                                    {% for category in recipe.categories %}
+                                                        <span class="category-tag">{{ category.name }}</span>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                        </a>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="no-recipes">No recipes in this meal plan.</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="grocery-list-section">
+                        <h2>Grocery List</h2>
+                        {% if meal_plan.all_ingredients %}
+                            <ul class="grocery-list">
+                                {% for ingredient in meal_plan.all_ingredients %}
+                                    <li class="grocery-item">
+                                        {% if ingredient.quantity %}
+                                            <span class="grocery-quantity">{{ ingredient.quantity }}</span>
+                                        {% endif %}
+                                        {% if ingredient.unit %}
+                                            <span class="grocery-unit">{{ ingredient.unit }}</span>
+                                        {% endif %}
+                                        <span class="grocery-name">{{ ingredient.name }}</span>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                            <div class="grocery-actions">
+                                <button class="print-button" onclick="window.print()">Print Grocery List</button>
+                            </div>
+                        {% else %}
+                            <p class="no-ingredients">No ingredients in this meal plan.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <footer class="main-footer">
+            <p>&copy; {{ current_year }} KitchenSage. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>
