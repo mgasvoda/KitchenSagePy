@@ -118,6 +118,15 @@ def update_meal_plan(
         if meal_plan_id is None and name is None:
             raise ValueError("Name is required when creating a new meal plan")
         
+        # Ensure all categories exist in the database before creating/updating the meal plan
+        processed_categories = None
+        if categories is not None:
+            processed_categories = []
+            for category_name in categories:
+                # This will create the category if it doesn't exist
+                crud.get_or_create_category(db, category_name)
+                processed_categories.append(category_name)
+        
         # Create meal plan schema
         meal_plan_schema = schemas.MealPlanCreate(
             name=name if name is not None else "",
@@ -140,11 +149,11 @@ def update_meal_plan(
                 return None
             
             # Update categories if provided
-            if categories is not None:
+            if processed_categories is not None:
                 meal_plan = crud.update_meal_plan_categories(
                     db, 
                     meal_plan_id=meal_plan_id, 
-                    categories=categories
+                    categories=processed_categories
                 )
                 
                 if meal_plan is None:
@@ -237,6 +246,14 @@ def update_recipe(
                 ) for direction in directions
             ]
         
+        # Ensure all categories exist in the database before creating the recipe schema
+        processed_categories = []
+        if categories is not None:
+            for category_name in categories:
+                # This will create the category if it doesn't exist
+                crud.get_or_create_category(db, category_name)
+                processed_categories.append(category_name)
+        
         # Create recipe schema
         recipe_schema = schemas.RecipeCreate(
             name=name if name is not None else "",
@@ -244,7 +261,7 @@ def update_recipe(
             rating=rating if rating is not None else 0,
             prep_time=prep_time,
             cook_time=cook_time,
-            categories=categories if categories is not None else [],
+            categories=processed_categories if processed_categories else [],
             ingredients=schema_ingredients,
             directions=schema_directions
         )
